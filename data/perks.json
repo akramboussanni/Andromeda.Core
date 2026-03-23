@@ -1,0 +1,779 @@
+[
+  {
+    "guid": "bedside_manner_1",
+    "name": "Bedside Manner 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "bedside_manner_2",
+    "name": "Bedside Manner 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "bedside_manner_3",
+    "name": "Bedside Manner 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "remote_diagnostics_1",
+    "name": "Remote Diagnostics 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "remote_diagnostics_2",
+    "name": "Remote Diagnostics 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "remote_diagnostics_3",
+    "name": "Remote Diagnostics 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "ninja_1",
+    "name": "Ninja 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "ninja_2",
+    "name": "Ninja 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "ninja_3",
+    "name": "Ninja 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "advanced_optics_1",
+    "name": "Advanced Optics 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "advanced_optics_2",
+    "name": "Advanced Optics 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "advanced_optics_3",
+    "name": "Advanced Optics 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "critical_failure_1",
+    "name": "Critical Failure 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "critical_failure_2",
+    "name": "Critical Failure 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "critical_failure_3",
+    "name": "Critical Failure 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "fusion_cell_1",
+    "name": "Fusion Cell 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "fusion_cell_2",
+    "name": "Fusion Cell 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "fusion_cell_3",
+    "name": "Fusion Cell 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "knuckle_dusters_1",
+    "name": "Knuckle Dusters 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "knuckle_dusters_2",
+    "name": "Knuckle Dusters 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "knuckle_dusters_3",
+    "name": "Knuckle Dusters 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "second_wind_1",
+    "name": "Second Wind 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "second_wind_2",
+    "name": "Second Wind 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "second_wind_3",
+    "name": "Second Wind 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "dead_shot_1",
+    "name": "Dead Shot 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "dead_shot_2",
+    "name": "Dead Shot 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "dead_shot_3",
+    "name": "Dead Shot 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "mercenary_1",
+    "name": "Mercenary 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "mercenary_2",
+    "name": "Mercenary 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "mercenary_3",
+    "name": "Mercenary 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "lean_build_1",
+    "name": "Lean Build 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "lean_build_2",
+    "name": "Lean Build 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "lean_build_3",
+    "name": "Lean Build 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "scrappy_1",
+    "name": "Scrappy 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "scrappy_2",
+    "name": "Scrappy 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "scrappy_3",
+    "name": "Scrappy 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "channeler_1",
+    "name": "Channeler 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "channeler_2",
+    "name": "Channeler 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "channeler_3",
+    "name": "Channeler 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "alien_affinity_1",
+    "name": "Alien Affinity 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "alien_affinity_2",
+    "name": "Alien Affinity 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "alien_affinity_3",
+    "name": "Alien Affinity 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "utility_belt_1",
+    "name": "Utility Belt 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "utility_belt_2",
+    "name": "Utility Belt 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "utility_belt_3",
+    "name": "Utility Belt 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "bullet_proof_vest_1",
+    "name": "Bullet Proof Vest 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "bullet_proof_vest_2",
+    "name": "Bullet Proof Vest 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "bullet_proof_vest_3",
+    "name": "Bullet Proof Vest 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "concealed_blade_1",
+    "name": "Concealed Blade 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "concealed_blade_2",
+    "name": "Concealed Blade 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "concealed_blade_3",
+    "name": "Concealed Blade 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "backstab_1",
+    "name": "Backstab 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "backstab_2",
+    "name": "Backstab 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "backstab_3",
+    "name": "Backstab 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "subzero_1",
+    "name": "Subzero 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "subzero_2",
+    "name": "Subzero 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "subzero_3",
+    "name": "Subzero 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "arctic_expanse_1",
+    "name": "Arctic Expanse 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "arctic_expanse_2",
+    "name": "Arctic Expanse 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "arctic_expanse_3",
+    "name": "Arctic Expanse 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "robust_1",
+    "name": "Robust 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "robust_2",
+    "name": "Robust 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "robust_3",
+    "name": "Robust 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "cybernetics_1",
+    "name": "Cybernetics 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "cybernetics_2",
+    "name": "Cybernetics 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "cybernetics_3",
+    "name": "Cybernetics 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "revenge_1",
+    "name": "Revenge 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "revenge_2",
+    "name": "Revenge 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "revenge_3",
+    "name": "Revenge 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "jerry_rigged_1",
+    "name": "Jerry Rigged 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "jerry_rigged_2",
+    "name": "Jerry Rigged 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "jerry_rigged_3",
+    "name": "Jerry Rigged 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "toxic_blade_1",
+    "name": "Toxic Blade 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "toxic_blade_2",
+    "name": "Toxic Blade 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "toxic_blade_3",
+    "name": "Toxic Blade 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "heavy_wrench_1",
+    "name": "Heavy Wrench 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "heavy_wrench_2",
+    "name": "Heavy Wrench 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "heavy_wrench_3",
+    "name": "Heavy Wrench 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "battle_axe_1",
+    "name": "Battle Axe 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "battle_axe_2",
+    "name": "Battle Axe 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "battle_axe_3",
+    "name": "Battle Axe 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "ballistic_plating_1",
+    "name": "Ballistic Plating 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "ballistic_plating_2",
+    "name": "Ballistic Plating 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "ballistic_plating_3",
+    "name": "Ballistic Plating 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "nanoweave_vest_1",
+    "name": "Nanoweave Vest 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "nanoweave_vest_2",
+    "name": "Nanoweave Vest 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "nanoweave_vest_3",
+    "name": "Nanoweave Vest 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "alien_hunter_1",
+    "name": "Alien Hunter 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "alien_hunter_2",
+    "name": "Alien Hunter 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "alien_hunter_3",
+    "name": "Alien Hunter 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "overdrive_1",
+    "name": "Overdrive 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "overdrive_2",
+    "name": "Overdrive 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "overdrive_3",
+    "name": "Overdrive 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "shock_therapy_1",
+    "name": "Shock Therapy 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "shock_therapy_2",
+    "name": "Shock Therapy 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "shock_therapy_3",
+    "name": "Shock Therapy 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "Nope_nope_nope_1",
+    "name": "Nope Nope Nope 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "Nope_nope_nope_2",
+    "name": "Nope Nope Nope 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "Nope_nope_nope_3",
+    "name": "Nope Nope Nope 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "pack_tactics_1",
+    "name": "Pack Tactics 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "pack_tactics_2",
+    "name": "Pack Tactics 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "pack_tactics_3",
+    "name": "Pack Tactics 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "symbiont_expert_1",
+    "name": "Symbiont Expert 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "symbiont_expert_2",
+    "name": "Symbiont Expert 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "symbiont_expert_3",
+    "name": "Symbiont Expert 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "espresso_1",
+    "name": "Espresso 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "espresso_2",
+    "name": "Espresso 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "espresso_3",
+    "name": "Espresso 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "flanking_1",
+    "name": "Flanking 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "flanking_2",
+    "name": "Flanking 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "flanking_3",
+    "name": "Flanking 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  }
+]

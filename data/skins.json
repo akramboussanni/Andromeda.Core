@@ -1,0 +1,212 @@
+[
+  {
+    "guid": "medic",
+    "name": "Medic (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "soldier_medic",
+    "name": "Soldier Medic (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "corrupted_medic",
+    "name": "Corrupted Medic (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "bronze_medic",
+    "name": "Bronze Medic (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "spy",
+    "name": "Spy (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "punk_spy",
+    "name": "Punk Spy (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "techno_spy",
+    "name": "Techno Spy (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "wraith_spy",
+    "name": "Wraith Spy (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "scientist",
+    "name": "Scientist (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "biohazard_scientist",
+    "name": "Biohazard Scientist (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "mastermind_scientist",
+    "name": "Mastermind Scientist (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "retro_scientist",
+    "name": "Retro Scientist (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "commando",
+    "name": "Commando (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "tactical_commando",
+    "name": "Tactical Commando (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "franken_commando",
+    "name": "Franken Commando (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "gold_commando",
+    "name": "Gold Commando (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "captain",
+    "name": "Captain (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "commodore_captain",
+    "name": "Commodore Captain (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "demon_captain",
+    "name": "Demon Captain (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "silver_captain",
+    "name": "Silver Captain (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "space_monkey",
+    "name": "Space Monkey (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "experimental_monkey",
+    "name": "Experimental Monkey (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "demon_monkey",
+    "name": "Demon Monkey (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "diamond_monkey",
+    "name": "Diamond Monkey (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "officer",
+    "name": "Officer (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "TacticalOfficer",
+    "name": "Tactical Officer (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "CorruptedOfficer",
+    "name": "Corrupted Officer (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "AdmiralOfficer",
+    "name": "Admiral Officer (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "grifter",
+    "name": "Grifter (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "BioHazardGrifter",
+    "name": "Biohazard Grifter (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "lunar_monkey",
+    "name": "Lunar Monkey (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "assassin",
+    "name": "Assassin (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "cryonaut",
+    "name": "Cryonaut (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "anime_spy",
+    "name": "Anime Spy (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "soviet_commando",
+    "name": "Soviet Commando (skin settings)",
+    "purchasable": true,
+    "cost": 0
+  }
+]

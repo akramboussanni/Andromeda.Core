@@ -1,0 +1,422 @@
+{
+  "characters": {
+    "medic": {
+      "ability": {
+        "base_guid": "heal_1",
+        "tiers": [
+          "heal_1",
+          "heal_2",
+          "heal_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "bedside_manner_1",
+          "tiers": [
+            "bedside_manner_1",
+            "bedside_manner_2",
+            "bedside_manner_3"
+          ]
+        },
+        {
+          "base_guid": "remote_diagnostics_1",
+          "tiers": [
+            "remote_diagnostics_1",
+            "remote_diagnostics_2",
+            "remote_diagnostics_3"
+          ]
+        }
+      ]
+    },
+    "grifter": {
+      "ability": {
+        "base_guid": "spell_steal_1",
+        "tiers": [
+          "spell_steal_1",
+          "spell_steal_2",
+          "spell_steal_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "channeler_1",
+          "tiers": [
+            "channeler_1",
+            "channeler_2",
+            "channeler_3"
+          ]
+        },
+        {
+          "base_guid": "alien_affinity_1",
+          "tiers": [
+            "alien_affinity_1",
+            "alien_affinity_2",
+            "alien_affinity_3"
+          ]
+        }
+      ]
+    },
+    "spy": {
+      "ability": {
+        "base_guid": "scan_1",
+        "tiers": [
+          "scan_1",
+          "scan_2",
+          "scan_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "ninja_1",
+          "tiers": [
+            "ninja_1",
+            "ninja_2",
+            "ninja_3"
+          ]
+        },
+        {
+          "base_guid": "advanced_optics_1",
+          "tiers": [
+            "advanced_optics_1",
+            "advanced_optics_2",
+            "advanced_optics_3"
+          ]
+        }
+      ]
+    },
+    "captain": {
+      "ability": {
+        "base_guid": "shield_1",
+        "tiers": [
+          "shield_1",
+          "shield_2",
+          "shield_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "dead_shot_1",
+          "tiers": [
+            "dead_shot_1",
+            "dead_shot_2",
+            "dead_shot_3"
+          ]
+        },
+        {
+          "base_guid": "mercenary_1",
+          "tiers": [
+            "mercenary_1",
+            "mercenary_2",
+            "mercenary_3"
+          ]
+        }
+      ]
+    },
+    "space_monkey": {
+      "ability": {
+        "base_guid": "combat_roll_1",
+        "tiers": [
+          "combat_roll_1",
+          "combat_roll_2",
+          "combat_roll_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "lean_build_1",
+          "tiers": [
+            "lean_build_1",
+            "lean_build_2",
+            "lean_build_3"
+          ]
+        },
+        {
+          "base_guid": "scrappy_1",
+          "tiers": [
+            "scrappy_1",
+            "scrappy_2",
+            "scrappy_3"
+          ]
+        }
+      ]
+    },
+    "officer": {
+      "ability": {
+        "base_guid": "lock_door_1",
+        "tiers": [
+          "lock_door_1",
+          "lock_door_2",
+          "lock_door_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "utility_belt_1",
+          "tiers": [
+            "utility_belt_1",
+            "utility_belt_2",
+            "utility_belt_3"
+          ]
+        },
+        {
+          "base_guid": "bullet_proof_vest_1",
+          "tiers": [
+            "bullet_proof_vest_1",
+            "bullet_proof_vest_2",
+            "bullet_proof_vest_3"
+          ]
+        }
+      ]
+    },
+    "scientist": {
+      "ability": {
+        "base_guid": "teleport_deploy_1",
+        "tiers": [
+          "teleport_deploy_1",
+          "teleport_deploy_2",
+          "teleport_deploy_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "critical_failure_1",
+          "tiers": [
+            "critical_failure_1",
+            "critical_failure_2",
+            "critical_failure_3"
+          ]
+        },
+        {
+          "base_guid": "fusion_cell_1",
+          "tiers": [
+            "fusion_cell_1",
+            "fusion_cell_2",
+            "fusion_cell_3"
+          ]
+        }
+      ]
+    },
+    "commando": {
+      "ability": {
+        "base_guid": "battle_rage_1",
+        "tiers": [
+          "battle_rage_1",
+          "battle_rage_2",
+          "battle_rage_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "knuckle_dusters_1",
+          "tiers": [
+            "knuckle_dusters_1",
+            "knuckle_dusters_2",
+            "knuckle_dusters_3"
+          ]
+        },
+        {
+          "base_guid": "second_wind_1",
+          "tiers": [
+            "second_wind_1",
+            "second_wind_2",
+            "second_wind_3"
+          ]
+        }
+      ]
+    },
+    "assassin": {
+      "ability": {
+        "base_guid": "shadow_sneak_1",
+        "tiers": [
+          "shadow_sneak_1",
+          "shadow_sneak_2",
+          "shadow_sneak_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "concealed_blade_1",
+          "tiers": [
+            "concealed_blade_1",
+            "concealed_blade_2",
+            "concealed_blade_3"
+          ]
+        },
+        {
+          "base_guid": "backstab_1",
+          "tiers": [
+            "backstab_1",
+            "backstab_2",
+            "backstab_3"
+          ]
+        }
+      ]
+    },
+    "cryonaut": {
+      "ability": {
+        "base_guid": "cryobarrier_1",
+        "tiers": [
+          "cryobarrier_1",
+          "cryobarrier_2",
+          "cryobarrier_3"
+        ]
+      },
+      "perks": [
+        {
+          "base_guid": "subzero_1",
+          "tiers": [
+            "subzero_1",
+            "subzero_2",
+            "subzero_3"
+          ]
+        },
+        {
+          "base_guid": "arctic_expanse_1",
+          "tiers": [
+            "arctic_expanse_1",
+            "arctic_expanse_2",
+            "arctic_expanse_3"
+          ]
+        }
+      ]
+    }
+  },
+  "general_perks": [
+    {
+      "base_guid": "robust_1",
+      "tiers": [
+        "robust_1",
+        "robust_2",
+        "robust_3"
+      ]
+    },
+    {
+      "base_guid": "cybernetics_1",
+      "tiers": [
+        "cybernetics_1",
+        "cybernetics_2",
+        "cybernetics_3"
+      ]
+    },
+    {
+      "base_guid": "revenge_1",
+      "tiers": [
+        "revenge_1",
+        "revenge_2",
+        "revenge_3"
+      ]
+    },
+    {
+      "base_guid": "jerry_rigged_1",
+      "tiers": [
+        "jerry_rigged_1",
+        "jerry_rigged_2",
+        "jerry_rigged_3"
+      ]
+    },
+    {
+      "base_guid": "toxic_blade_1",
+      "tiers": [
+        "toxic_blade_1",
+        "toxic_blade_2",
+        "toxic_blade_3"
+      ]
+    },
+    {
+      "base_guid": "heavy_wrench_1",
+      "tiers": [
+        "heavy_wrench_1",
+        "heavy_wrench_2",
+        "heavy_wrench_3"
+      ]
+    },
+    {
+      "base_guid": "battle_axe_1",
+      "tiers": [
+        "battle_axe_1",
+        "battle_axe_2",
+        "battle_axe_3"
+      ]
+    },
+    {
+      "base_guid": "ballistic_plating_1",
+      "tiers": [
+        "ballistic_plating_1",
+        "ballistic_plating_2",
+        "ballistic_plating_3"
+      ]
+    },
+    {
+      "base_guid": "nanoweave_vest_1",
+      "tiers": [
+        "nanoweave_vest_1",
+        "nanoweave_vest_2",
+        "nanoweave_vest_3"
+      ]
+    },
+    {
+      "base_guid": "alien_hunter_1",
+      "tiers": [
+        "alien_hunter_1",
+        "alien_hunter_2",
+        "alien_hunter_3"
+      ]
+    },
+    {
+      "base_guid": "overdrive_1",
+      "tiers": [
+        "overdrive_1",
+        "overdrive_2",
+        "overdrive_3"
+      ]
+    },
+    {
+      "base_guid": "shock_therapy_1",
+      "tiers": [
+        "shock_therapy_1",
+        "shock_therapy_2",
+        "shock_therapy_3"
+      ]
+    },
+    {
+      "base_guid": "Nope_nope_nope_1",
+      "tiers": [
+        "Nope_nope_nope_1",
+        "Nope_nope_nope_2",
+        "Nope_nope_nope_3"
+      ]
+    },
+    {
+      "base_guid": "pack_tactics_1",
+      "tiers": [
+        "pack_tactics_1",
+        "pack_tactics_2",
+        "pack_tactics_3"
+      ]
+    },
+    {
+      "base_guid": "symbiont_expert_1",
+      "tiers": [
+        "symbiont_expert_1",
+        "symbiont_expert_2",
+        "symbiont_expert_3"
+      ]
+    },
+    {
+      "base_guid": "espresso_1",
+      "tiers": [
+        "espresso_1",
+        "espresso_2",
+        "espresso_3"
+      ]
+    },
+    {
+      "base_guid": "flanking_1",
+      "tiers": [
+        "flanking_1",
+        "flanking_2",
+        "flanking_3"
+      ]
+    }
+  ]
+}

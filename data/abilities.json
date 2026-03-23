@@ -1,0 +1,182 @@
+[
+  {
+    "guid": "teleport_deploy_1",
+    "name": "Teleport Deploy 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "teleport_deploy_2",
+    "name": "Teleport Deploy 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "teleport_deploy_3",
+    "name": "Teleport Deploy 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "heal_1",
+    "name": "Heal 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "heal_2",
+    "name": "Heal 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "heal_3",
+    "name": "Heal 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "spell_steal_1",
+    "name": "Spell Steal 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "spell_steal_2",
+    "name": "Spell Steal 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "spell_steal_3",
+    "name": "Spell Steal 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "scan_1",
+    "name": "Scan 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "scan_2",
+    "name": "Scan 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "scan_3",
+    "name": "Scan 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shield_1",
+    "name": "Shield 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shield_2",
+    "name": "Shield 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shield_3",
+    "name": "Shield 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "combat_roll_1",
+    "name": "Combat Roll 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "combat_roll_2",
+    "name": "Combat Roll 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "combat_roll_3",
+    "name": "Combat Roll 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "lock_door_1",
+    "name": "Lock Door 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "lock_door_2",
+    "name": "Lock Door 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "lock_door_3",
+    "name": "Lock Door 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "battle_rage_1",
+    "name": "Battle Rage 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "battle_rage_2",
+    "name": "Battle Rage 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "battle_rage_3",
+    "name": "Battle Rage 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shadow_sneak_1",
+    "name": "Shadow Sneak 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shadow_sneak_2",
+    "name": "Shadow Sneak 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shadow_sneak_3",
+    "name": "Shadow Sneak 3",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "cryobarrier_1",
+    "name": "Cryobarrier 1",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "cryobarrier_2",
+    "name": "Cryobarrier 2",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "cryobarrier_3",
+    "name": "Cryobarrier 3",
+    "purchasable": true,
+    "cost": 0
+  }
+]

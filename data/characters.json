@@ -1,0 +1,62 @@
+[
+  {
+    "guid": "medic",
+    "name": "Medic (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "spy",
+    "name": "Spy (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "scientist",
+    "name": "Scientist (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "commando",
+    "name": "Commando (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "captain",
+    "name": "Captain (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "space_monkey",
+    "name": "Space Monkey (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "officer",
+    "name": "Officer (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "grifter",
+    "name": "Grifter (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "assassin",
+    "name": "Assassin (character settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "cryonaut",
+    "name": "Cryonaut (character settings)",
+    "purchasable": true,
+    "cost": 0
+  }
+]

@@ -1,0 +1,302 @@
+[
+  {
+    "guid": "AlienVaccine_charged",
+    "name": "Alien Vaccine (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Bandages_charged",
+    "name": "Bandages (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "StimCola_charged",
+    "name": "Stim Cola (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "LaserSword_charged",
+    "name": "Laser Sword (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "LaserRepeater_charged",
+    "name": "Laser Repeater (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Knife_charged",
+    "name": "Knife (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Knife_uncharged",
+    "name": "Knife (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Wrench_charged",
+    "name": "Wrench (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Wrench_uncharged",
+    "name": "Wrench (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "ThrowingAxe_charged",
+    "name": "Throwing Axe (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "ThrowingAxe_uncharged",
+    "name": "Throwing Axe (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Sledgehammer_charged",
+    "name": "Sledgehammer (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Sledgehammer_uncharged",
+    "name": "Sledgehammer (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "SniperRifle_charged",
+    "name": "Sniper Rifle (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "SniperRifle_uncharged",
+    "name": "Sniper Rifle (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "StunGun_charged",
+    "name": "Stun Gun (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "stun_gun",
+    "name": "Stun Gun (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "HealthKit_charged",
+    "name": "Health Kit (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "health_kit",
+    "name": "Health Kit (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "ForceBaton_charged",
+    "name": "Force Baton (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "force_baton",
+    "name": "Force Baton (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "SnareTrap_charged",
+    "name": "Snare Trap (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "snare_trap",
+    "name": "Snare Trap (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "JumpDrive_charged",
+    "name": "Jump Drive (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "jump_drive",
+    "name": "Jump Drive (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "EMP_charged_2",
+    "name": "EMP (item settings) (charged) (2)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "EMP_charged_1",
+    "name": "EMP (item settings) (charged) (1)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "emp",
+    "name": "EMP (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "ForceBlaster_charged",
+    "name": "Force Blaster (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "force_blaster",
+    "name": "Force Blaster (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "StimSerum_charged",
+    "name": "Stim Serum (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "stim_serum",
+    "name": "Stim Serum (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Mortar_charged",
+    "name": "Mortar (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Mortar_uncharged",
+    "name": "Mortar (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "SecurityCamera_charged",
+    "name": "Security Camera (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "SecuirtyCamera_uncharged",
+    "name": "Security Camera (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Molotov_Cocktail",
+    "name": "Molotov Cocktail (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Shiv",
+    "name": "Shiv (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Hookshot_charged",
+    "name": "Hookshot (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "hookshot",
+    "name": "Hookshot (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Activate_animation",
+    "name": "Activate animation (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Smoke_bomb",
+    "name": "Smoke Bomb (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Punch",
+    "name": "Brawler (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Fusion_cell_uncharged",
+    "name": "Fusion Cell (item settings) (uncharged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Fusion_cell_charged",
+    "name": "Fusion Cell (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "bulletproof_vest",
+    "name": "Bulletproof vest 1 (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "shield_battery",
+    "name": "Shield Battery (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "bulletproof_vest",
+    "name": "Bulletproof vest 2 (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "bulletproof_vest",
+    "name": "Bulletproof vest 3 (item settings)",
+    "purchasable": true,
+    "cost": 0
+  },
+  {
+    "guid": "Concealed_blade",
+    "name": "Concealed Blade (item settings) (charged)",
+    "purchasable": true,
+    "cost": 0
+  }
+]

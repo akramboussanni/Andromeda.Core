@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.env
+
+# Database
+*.db
+*.sqlite3
+parasite.db
+parasite.db-*
+
+# Logs
+*.log
+game_logs.txt
+logging.txt
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Static analysis tools
+.mypy_cache/
+.tox/

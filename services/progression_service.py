@@ -1,7 +1,9 @@
 import random
-from typing import Tuple, List, Optional, Set
-from models import PlayerCharacterLevelData
+from typing import List, Optional, Set, Tuple
+
 from catalog import Catalog
+from models import PlayerCharacterLevelData
+
 
 class ProgressionService:
     MAX_LEVEL_CAP = 20

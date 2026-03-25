@@ -2,60 +2,70 @@
   {
     "guid": "medic",
     "name": "Medic (character settings)",
+    "skins": ["medic", "soldier_medic", "corrupted_medic", "bronze_medic"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "spy",
     "name": "Spy (character settings)",
+    "skins": ["spy", "punk_spy", "techno_spy", "wraith_spy", "anime_spy"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "scientist",
     "name": "Scientist (character settings)",
+    "skins": ["scientist", "biohazard_scientist", "mastermind_scientist", "retro_scientist"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "commando",
     "name": "Commando (character settings)",
+    "skins": ["commando", "tactical_commando", "franken_commando", "gold_commando", "soviet_commando"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "captain",
     "name": "Captain (character settings)",
+    "skins": ["captain", "commodore_captain", "demon_captain", "silver_captain"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "space_monkey",
     "name": "Space Monkey (character settings)",
+    "skins": ["space_monkey", "experimental_monkey", "demon_monkey", "diamond_monkey", "lunar_monkey"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "officer",
     "name": "Officer (character settings)",
+    "skins": ["officer", "TacticalOfficer", "CorruptedOfficer", "AdmiralOfficer"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "grifter",
     "name": "Grifter (character settings)",
+    "skins": ["grifter", "BioHazardGrifter"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "assassin",
     "name": "Assassin (character settings)",
+    "skins": ["assassin"],
     "purchasable": true,
     "cost": 0
   },
   {
     "guid": "cryonaut",
     "name": "Cryonaut (character settings)",
+    "skins": ["wraith_spy"],
     "purchasable": true,
     "cost": 0
   }

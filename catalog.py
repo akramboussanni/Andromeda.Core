@@ -1,13 +1,56 @@
 import json
 import os
-from typing import List, Dict, Any
-from models import CharacterData, ItemData, AbilityData, PerkData, SkinData
+import re
+from typing import Any, Dict, List
+
+from models import AbilityData, CharacterData, ItemData, PerkData, SkinData
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 CATALOG_PATH = os.path.join(DATA_DIR, "catalog.json")
 
 class Catalog:
     _data: Dict[str, Any] = {}
+
+    @staticmethod
+    def _to_snake_case(value: str) -> str:
+        text = (value or "").strip().lower()
+        text = re.sub(r"[^a-z0-9]+", "_", text)
+        text = text.strip("_")
+        if text.endswith("_skin_settings"):
+            text = text[: -len("_skin_settings")]
+        elif text.endswith("_settings"):
+            text = text[: -len("_settings")]
+        return text.strip("_")
+
+    @classmethod
+    def _ensure_skin_guids(cls, skins: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen = set()
+        fixed: List[Dict[str, Any]] = []
+
+        for item in skins or []:
+            entry = dict(item or {})
+            guid = (entry.get("guid") or "").strip()
+
+            if not guid:
+                generated = cls._to_snake_case(entry.get("name") or "")
+                if generated:
+                    guid = generated
+
+            if not guid:
+                # Keep behavior explicit for truly invalid rows.
+                continue
+
+            base = guid
+            suffix = 2
+            while guid in seen:
+                guid = f"{base}_{suffix}"
+                suffix += 1
+
+            entry["guid"] = guid
+            seen.add(guid)
+            fixed.append(entry)
+
+        return fixed
 
     @classmethod
     def load(cls):
@@ -35,6 +78,7 @@ class Catalog:
         abilities = load_file("abilities.json")
         perks = load_file("perks.json")
         skins = load_file("skins.json")
+        skins = cls._ensure_skin_guids(skins)
         # Progression might be a dict, not a list
         progression_path = os.path.join(DATA_DIR, "progression.json")
         progression = {}

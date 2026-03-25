@@ -42,7 +42,8 @@ async def server_heartbeat(req: ServerHeartbeatRequest):
 
 @router.post("/server/shutdown", response_model=Response)
 async def server_shutdown(req: ServerShutdownRequest):
-    logger.info(f"[SERVER-SHUTDOWN] session={req.sessionId}")
+    reason_str = req.reason or "Unknown / Closed manually"
+    logger.info(f"[SERVER-SHUTDOWN] session={req.sessionId} reason={reason_str}")
     ps.close_party(req.sessionId)
     return Response()
 

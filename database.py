@@ -11,19 +11,22 @@ logger = logging.getLogger("Database")
 DB_PATH = os.getenv("DB_PATH", "./parasite.db")
 
 
-async def get_db() -> aiosqlite.Connection:
-    """Open and return a configured aiosqlite connection."""
-    db = await aiosqlite.connect(DB_PATH)
-    db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA journal_mode=WAL")   # concurrent reads
-    await db.execute("PRAGMA synchronous=NORMAL") # faster writes, still safe
-    await db.execute("PRAGMA foreign_keys=ON")
-    return db
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_db():
+    """Yields a configured aiosqlite connection."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA journal_mode=WAL")   # concurrent reads
+        await db.execute("PRAGMA synchronous=NORMAL") # faster writes, still safe
+        await db.execute("PRAGMA foreign_keys=ON")
+        yield db
 
 
 async def init_db():
     """Create tables if they don't exist."""
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.executescript("""
             CREATE TABLE IF NOT EXISTS players (
                 steam_id          TEXT PRIMARY KEY,
@@ -117,7 +120,7 @@ def _row_to_player(row, char_rows) -> PlayerData:
 # ---------------------------------------------------------------------------
 
 async def player_exists(steam_id: str) -> bool:
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT 1 FROM players WHERE steam_id = ?", (steam_id,)
         ) as cur:
@@ -129,7 +132,7 @@ async def get_player(steam_id: str) -> Optional[PlayerData]:
     Return PlayerData for an existing player, or None if not found.
     DOES NOT create new records.
     """
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM players WHERE steam_id = ?", (steam_id,)
         ) as cur:
@@ -154,7 +157,7 @@ async def get_players_batch(steam_ids: List[str]) -> List[PlayerData]:
     if not steam_ids:
         return []
     placeholders = ",".join("?" * len(steam_ids))
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             f"SELECT * FROM players WHERE steam_id IN ({placeholders})", steam_ids
         ) as cur:
@@ -186,7 +189,7 @@ async def get_players_batch(steam_ids: List[str]) -> List[PlayerData]:
 async def create_player(player: PlayerData):
     """Insert a brand-new player + their characters. Idempotent if already exists."""
     now = time.time()
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             """INSERT OR IGNORE INTO players
                (steam_id, rank, credits, funds, total_games, kickstarter_backer,
@@ -233,7 +236,7 @@ async def save_player(player: PlayerData):
     Upsert a player record.  Uses a single transaction so partial writes can't happen.
     """
     now = time.time()
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             """INSERT INTO players
                (steam_id, rank, credits, funds, total_games, kickstarter_backer,
@@ -295,7 +298,7 @@ async def add_match_history_entries(entries: list):
     """Bulk-insert end-of-game stats rows."""
     if not entries:
         return
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.executemany(
             """INSERT INTO match_history
                (steam_id, timestamp, game_id, game_length, aliens_won, crew_won,
@@ -309,7 +312,7 @@ async def add_match_history_entries(entries: list):
 
 async def get_match_history(steam_id: str, limit: int = 50) -> list:
     """Return the most recent matches for a player."""
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             """SELECT * FROM match_history WHERE steam_id = ?
                ORDER BY id DESC LIMIT ?""",

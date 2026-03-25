@@ -11,8 +11,8 @@ env/
 # Database
 *.db
 *.sqlite3
-parasite.db
-parasite.db-*
+Andromeda.db
+Andromeda.db-*
 
 # Logs
 *.log

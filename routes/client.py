@@ -1,34 +1,68 @@
-import uuid
 import logging
-from fastapi import APIRouter, Header
+import time
+import uuid
+from threading import Lock
 from typing import Optional
 
-import services.party_service as ps
 import services.auth_service as auth
-from services.user_service import UserService
-from services.progression_service import ProgressionService
-from services.game_server_service import spawn_server
+import services.party_service as ps
+from fastapi import APIRouter, Header
 from models import (
+    CharactersLevelsGetRequest,
+    CharactersLevelsGetResponse,
+    CharactersLevelsNewRequest,
+    CharactersLevelsNewResponse,
+    CharactersLevelsNewResponseData,
+    CharactersLevelsUnlockRequest,
+    FundsOffersGetResponse,
+    GamesCustomNewRequest,
+    GamesCustomNewResponse,
+    GamesJoinRequest,
+    GamesJoinResponse,
+    GamesNewRequest,
+    GamesNewResponse,
+    JoinData,
+    MatchStartRequest,
+    MatchStartResponse,
+    MatchStartResponseData,
+    PartyCreateRequest,
+    PartyCreateResponse,
+    PartyDetailsResponse,
+    PartyDetailsResponseData,
+    PartyJoinRequest,
+    PartyJoinResponse,
+    PartyKickRequest,
+    PartyLeaveRequest,
+    PartyListRequest,
+    PartyListResponse,
+    PartyPlayerStatus,
+    PartyStatusUpdateRequest,
+    PlayerCharacterLevelData,
+    PlayersAuthGetRequest,
+    PlayersAuthGetResponse,
+    PlayersGetRequest,
+    PlayersGetResponse,
     Response,
-    PlayersGetRequest, PlayersGetResponse,
-    PlayersAuthGetRequest, PlayersAuthGetResponse,
-    FundsOffersGetResponse, FundOfferData,
-    GamesNewRequest, GamesNewResponse, JoinData,
-    GamesJoinRequest, GamesJoinResponse,
-    MatchStartRequest, MatchStartResponseData, MatchStartResponse,
-    CharactersLevelsNewResponse, CharactersLevelsNewResponseData,
-    PartyCreateRequest, PartyCreateResponse,
-    PartyJoinRequest, PartyJoinResponse,
-    PartyListRequest, PartyListResponse,
-    CharactersLevelsGetRequest, CharactersLevelsGetResponse, PlayerCharacterLevelData,
-    CharactersLevelsUnlockRequest, CharactersLevelsNewRequest,
-    PartyPlayerStatus, PartyDetailsResponseData, PartyDetailsResponse,
-    PartyLeaveRequest, PartyKickRequest, PartyStatusUpdateRequest,
-    GamesCustomNewRequest, GamesCustomNewResponse,
 )
+from services.game_server_service import spawn_server
+from services.progression_service import ProgressionService
+from services.user_service import UserService
 
 logger = logging.getLogger("ClientRoutes")
 router = APIRouter()
+
+
+# Prevent duplicate server spawns from repeated create requests
+# (especially around end-of-game transition retries).
+_SPAWN_DEDUPE_WINDOW_SECONDS = 180.0
+# Extra short window to collapse multi-client end-of-match create storms
+# into a single spawned server.
+_GLOBAL_SPAWN_BURST_WINDOW_SECONDS = 20.0
+_spawn_dedupe_lock = Lock()
+_recent_spawns = {}
+_inflight_spawns = set()
+_recent_global_spawns = {}
+_inflight_global_spawns = set()
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +76,123 @@ def _auth_hdr(authorization: Optional[str]) -> Optional[str]:
     return authorization.removeprefix("Bearer ").strip() or None
 
 
+def _cleanup_recent_spawns(now: float):
+    stale = [
+        source_session
+        for source_session, item in _recent_spawns.items()
+        if now - item["createdAt"] > _SPAWN_DEDUPE_WINDOW_SECONDS
+    ]
+    for source_session in stale:
+        _recent_spawns.pop(source_session, None)
+
+    stale_global = [
+        key
+        for key, item in _recent_global_spawns.items()
+        if now - item["createdAt"] > _GLOBAL_SPAWN_BURST_WINDOW_SECONDS
+    ]
+    for key in stale_global:
+        _recent_global_spawns.pop(key, None)
+
+
+def _build_spawn_key(
+    endpoint: str,
+    region: str,
+    source_session_id: Optional[str],
+    authorization: Optional[str],
+    game_mode: str,
+    is_public: bool,
+    max_players: int,
+) -> str:
+    caller = source_session_id or _auth_hdr(authorization) or "anon"
+    return f"{endpoint}|{caller}|{region}|{game_mode}|{is_public}|{max_players}"
+
+
+def _find_recent_spawn(spawn_key: str) -> Optional[str]:
+    now = time.time()
+    with _spawn_dedupe_lock:
+        _cleanup_recent_spawns(now)
+        item = _recent_spawns.get(spawn_key)
+        if not item:
+            return None
+
+        game_id = item["gameId"]
+        if ps.get_party(game_id) is None:
+            _recent_spawns.pop(spawn_key, None)
+            return None
+
+        return game_id
+
+
+def _build_global_spawn_key(
+    endpoint: str,
+    region: str,
+    game_mode: str,
+    is_public: bool,
+    max_players: int,
+) -> str:
+    return f"{endpoint}|{region}|{game_mode}|{is_public}|{max_players}"
+
+
+def _find_recent_global_spawn(global_spawn_key: str) -> Optional[str]:
+    now = time.time()
+    with _spawn_dedupe_lock:
+        _cleanup_recent_spawns(now)
+        item = _recent_global_spawns.get(global_spawn_key)
+        if not item:
+            return None
+
+        game_id = item["gameId"]
+        if ps.get_party(game_id) is None:
+            _recent_global_spawns.pop(global_spawn_key, None)
+            return None
+
+        return game_id
+
+
+def _remember_spawn(spawn_key: str, game_id: str):
+    with _spawn_dedupe_lock:
+        _cleanup_recent_spawns(time.time())
+        _recent_spawns[spawn_key] = {
+            "gameId": game_id,
+            "createdAt": time.time(),
+        }
+
+
+def _remember_global_spawn(global_spawn_key: str, game_id: str):
+    with _spawn_dedupe_lock:
+        _cleanup_recent_spawns(time.time())
+        _recent_global_spawns[global_spawn_key] = {
+            "gameId": game_id,
+            "createdAt": time.time(),
+        }
+
+
+def _begin_spawn(spawn_key: str) -> bool:
+    with _spawn_dedupe_lock:
+        if spawn_key in _inflight_spawns:
+            return False
+        _inflight_spawns.add(spawn_key)
+        return True
+
+
+def _end_spawn(spawn_key: str):
+    with _spawn_dedupe_lock:
+        _inflight_spawns.discard(spawn_key)
+
+
+def _begin_global_spawn(global_spawn_key: str) -> bool:
+    with _spawn_dedupe_lock:
+        if global_spawn_key in _inflight_global_spawns:
+            return False
+        _inflight_global_spawns.add(global_spawn_key)
+        return True
+
+
+def _end_global_spawn(global_spawn_key: str):
+    with _spawn_dedupe_lock:
+        _inflight_global_spawns.discard(global_spawn_key)
+
+
 # ===========================================================================
 # PARTY ROUTES
 # ===========================================================================
@@ -51,20 +202,23 @@ async def party_create(
     request: PartyCreateRequest, authorization: Optional[str] = Header(None)
 ):
     steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    game_id = str(uuid.uuid4())
 
     # Spawn a dedicated server (async — it will call /server/ready when ready)
     port = spawn_server(
         region=request.region,
         name=request.partyName,
+        session_id=game_id,
         is_public=request.isPublic,
     )
 
-    game_id, party = ps.create_party(
+    _, party = ps.create_party(
         region=request.region,
         party_name=request.partyName,
         is_public=request.isPublic,
         host_steam_id=steam_id,
         port=port if port > 0 else 0,
+        game_id=game_id,
     )
 
     # If the exe wasn't found (port=-1), still create the party in pending state
@@ -177,13 +331,17 @@ async def players_auth_get(req: PlayersAuthGetRequest):
 
 
 @router.post("/players/get", response_model=PlayersGetResponse)
-async def players_get(req: PlayersGetRequest):
+async def players_get(req: PlayersGetRequest, authorization: Optional[str] = Header(None)):
     """
     Bulk-fetch player profiles.
     Unknown players get a guest profile — no DB records are created.
-    This endpoint is called with ALL friend/lobby steam IDs, so we must
-    never auto-create accounts here.
+    However, the authenticated caller themselves must have their account guaranteed.
     """
+    my_steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if my_steam_id:
+        # Guarantee the calling user actually exists in the DB (creates one if missing)
+        await UserService.get_or_create(my_steam_id)
+
     data = await UserService.get_many(req.steamIds or [])
     return PlayersGetResponse(data=data)
 
@@ -193,30 +351,126 @@ async def players_get(req: PlayersGetRequest):
 # ===========================================================================
 
 @router.post("/games/new", response_model=GamesNewResponse)
-async def games_new(req: GamesNewRequest):
+async def games_new(
+    req: GamesNewRequest,
+    source_session_id: Optional[str] = Header(None, alias="Session-Id"),
+    authorization: Optional[str] = Header(None),
+):
     """Start a new public game session (not a party — used for quick-join matchmaking)."""
-    session_id = str(uuid.uuid4())
-    port = spawn_server(
+    spawn_key = _build_spawn_key(
+        endpoint="games/new",
         region=req.region,
-        name=req.gameName,
-        session_id=session_id,
+        source_session_id=source_session_id,
+        authorization=authorization,
+        game_mode=req.gamemodeName,
         is_public=req.isPublic,
+        max_players=req.maxPlayers,
     )
-    if port == -1:
-        return GamesNewResponse(status=500, message="Failed to spawn server", data=None)
+    global_spawn_key = _build_global_spawn_key(
+        endpoint="games/new",
+        region=req.region,
+        game_mode=req.gamemodeName,
+        is_public=req.isPublic,
+        max_players=req.maxPlayers,
+    )
 
-    # Register a party entry so clients can see it
-    import services.party_service as ps2
-    game_id, party = ps2.create_party(
-        region=req.region,
-        party_name=req.gameName,
-        is_public=req.isPublic,
-        host_steam_id="server",
-        port=port,
-    )
-    return GamesNewResponse(
-        data=JoinData(ipAddress=party["ipAddress"], port=port, sessionId=game_id)
-    )
+    recent_global_game_id = _find_recent_global_spawn(global_spawn_key)
+    if recent_global_game_id:
+        party = ps.get_party(recent_global_game_id)
+        if party:
+            logger.warning(
+                f"[SPAWN-DEDUPE] Reusing recent global /games/new spawn for key={global_spawn_key} game={recent_global_game_id}"
+            )
+            return GamesNewResponse(
+                data=JoinData(
+                    ipAddress=party["ipAddress"],
+                    port=party["port"],
+                    sessionId=recent_global_game_id,
+                )
+            )
+
+    recent_game_id = _find_recent_spawn(spawn_key)
+    if recent_game_id:
+        party = ps.get_party(recent_game_id)
+        if party:
+            logger.warning(
+                f"[SPAWN-DEDUPE] Reusing recent /games/new spawn for key={spawn_key} game={recent_game_id}"
+            )
+            return GamesNewResponse(
+                data=JoinData(
+                    ipAddress=party["ipAddress"],
+                    port=party["port"],
+                    sessionId=recent_game_id,
+                )
+            )
+
+    if not _begin_global_spawn(global_spawn_key):
+        in_progress_global_game_id = _find_recent_global_spawn(global_spawn_key)
+        if in_progress_global_game_id:
+            party = ps.get_party(in_progress_global_game_id)
+            if party:
+                logger.warning(
+                    f"[SPAWN-DEDUPE] Returning in-flight global /games/new spawn for key={global_spawn_key} game={in_progress_global_game_id}"
+                )
+                return GamesNewResponse(
+                    data=JoinData(
+                        ipAddress=party["ipAddress"],
+                        port=party["port"],
+                        sessionId=in_progress_global_game_id,
+                    )
+                )
+        return GamesNewResponse(status=429, message="Global game server spawn in progress", data=None)
+
+    if not _begin_spawn(spawn_key):
+        in_progress_game_id = _find_recent_spawn(spawn_key)
+        if in_progress_game_id:
+            party = ps.get_party(in_progress_game_id)
+            if party:
+                logger.warning(
+                    f"[SPAWN-DEDUPE] Returning in-flight /games/new spawn for key={spawn_key} game={in_progress_game_id}"
+                )
+                return GamesNewResponse(
+                    data=JoinData(
+                        ipAddress=party["ipAddress"],
+                        port=party["port"],
+                        sessionId=in_progress_game_id,
+                    )
+                )
+        _end_global_spawn(global_spawn_key)
+        return GamesNewResponse(status=429, message="Game server spawn in progress", data=None)
+
+    try:
+        session_id = str(uuid.uuid4())
+        port = spawn_server(
+            region=req.region,
+            name=req.gameName,
+            session_id=session_id,
+            is_public=req.isPublic,
+            gamemode=req.gamemodeName,
+            gamemode_data=req.gamemodeData,
+        )
+        if port == -1:
+            return GamesNewResponse(status=500, message="Failed to spawn server", data=None)
+
+        # Register a party entry so clients can see it
+        import services.party_service as ps2
+        game_id, party = ps2.create_party(
+            region=req.region,
+            party_name=req.gameName,
+            is_public=req.isPublic,
+            host_steam_id="server",
+            max_players=req.maxPlayers,
+            port=port,
+            game_id=session_id,
+        )
+        _remember_spawn(spawn_key, game_id)
+        _remember_global_spawn(global_spawn_key, game_id)
+        return GamesNewResponse(
+            data=JoinData(ipAddress=party["ipAddress"], port=port, sessionId=game_id)
+        )
+    finally:
+        _end_spawn(spawn_key)
+        _end_global_spawn(global_spawn_key)
 
 
 @router.post("/games/join", response_model=GamesJoinResponse)
@@ -225,30 +479,75 @@ async def games_join(request: GamesJoinRequest, authorization: Optional[str] = H
     join_data = ps.join_party(request.gameId, steam_id)
     if not join_data:
         return GamesJoinResponse(status=404, message="Game not found or full", data=None)
+    # If the game server is still starting up (port=0), return 404 so the
+    # client's built-in retry loop (ProgramClient.Join: 10 attempts, exponential
+    # backoff) keeps polling until /server/ready has been called.
+    if join_data.port == 0:
+        logger.info(f"[GAMES-JOIN] Game {request.gameId} server not ready yet (port=0), client will retry")
+        return GamesJoinResponse(status=404, message="Game server is starting up, please retry", data=None)
+    logger.info(f"[GAMES-JOIN] Directing {steam_id} to {join_data.ipAddress}:{join_data.port} for game {request.gameId}")
     return GamesJoinResponse(data=join_data)
 
 
 @router.post("/games/custom/new", response_model=GamesCustomNewResponse)
-async def games_custom_new(req: GamesCustomNewRequest):
+async def games_custom_new(
+    req: GamesCustomNewRequest,
+    source_session_id: Optional[str] = Header(None, alias="Session-Id"),
+    authorization: Optional[str] = Header(None),
+):
     """Create a custom game mode server."""
-    session_id = str(uuid.uuid4())
-    port = spawn_server(
+    spawn_key = _build_spawn_key(
+        endpoint="games/custom/new",
         region=req.region,
-        name=f"Custom-{req.gamemodeName}",
-        session_id=session_id,
+        source_session_id=source_session_id,
+        authorization=authorization,
+        game_mode=req.gamemodeName,
         is_public=False,
+        max_players=req.maxPlayers,
     )
-    if port == -1:
-        return GamesCustomNewResponse(status=500, message="Failed to spawn server", data=None)
 
-    _, party = ps.create_party(
-        region=req.region,
-        party_name=f"Custom-{req.gamemodeName}",
-        is_public=False,
-        host_steam_id="server",
-        port=port,
-    )
-    return GamesCustomNewResponse(data=session_id)
+    recent_game_id = _find_recent_spawn(spawn_key)
+    if recent_game_id:
+        logger.warning(
+            f"[SPAWN-DEDUPE] Reusing recent /games/custom/new spawn for key={spawn_key} game={recent_game_id}"
+        )
+        return GamesCustomNewResponse(data=recent_game_id)
+
+    if not _begin_spawn(spawn_key):
+        in_progress_game_id = _find_recent_spawn(spawn_key)
+        if in_progress_game_id:
+            logger.warning(
+                f"[SPAWN-DEDUPE] Returning in-flight /games/custom/new spawn for key={spawn_key} game={in_progress_game_id}"
+            )
+            return GamesCustomNewResponse(data=in_progress_game_id)
+        return GamesCustomNewResponse(status=429, message="Game server spawn in progress", data=None)
+
+    try:
+        session_id = str(uuid.uuid4())
+        port = spawn_server(
+            region=req.region,
+            name=f"Custom-{req.gamemodeName}",
+            session_id=session_id,
+            is_public=False,
+            gamemode=req.gamemodeName,
+            gamemode_data=req.gamemodeData,
+        )
+        if port == -1:
+            return GamesCustomNewResponse(status=500, message="Executable not found", data=None)
+
+        ps.create_party(
+            region=req.region,
+            party_name=f"Custom-{req.gamemodeName}",
+            is_public=False,
+            host_steam_id="server",
+            max_players=req.maxPlayers,
+            port=port,
+            game_id=session_id,
+        )
+        _remember_spawn(spawn_key, session_id)
+        return GamesCustomNewResponse(data=session_id)
+    finally:
+        _end_spawn(spawn_key)
 
 
 @router.post("/match/start", response_model=MatchStartResponse)
@@ -281,6 +580,11 @@ async def match_stop():
 async def characters_levels_new(
     body: CharactersLevelsNewRequest, authorization: Optional[str] = Header(None)
 ):
+    if UserService.is_maxed_progression_enabled():
+        return CharactersLevelsNewResponse(
+            data=CharactersLevelsNewResponseData(offeredPerks=[], offeredAbilities=[])
+        )
+
     steam_id = await auth.get_steam_id(_auth_hdr(authorization))
     char_guid = body.characterGuid
 
@@ -361,6 +665,9 @@ async def characters_levels_new(
 async def characters_levels_unlock(
     body: CharactersLevelsUnlockRequest, authorization: Optional[str] = Header(None)
 ):
+    if UserService.is_maxed_progression_enabled():
+        return Response()
+
     steam_id = await auth.get_steam_id(_auth_hdr(authorization))
     user = await UserService.get(steam_id)
     if not user:

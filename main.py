@@ -19,32 +19,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Server")
 
-app = FastAPI(title="Parasite Private Server", version="2.0.0")
+from contextlib import asynccontextmanager
 
-# ---------------------------------------------------------------------------
-# Middleware
-# ---------------------------------------------------------------------------
-app.middleware("http")(log_requests_middleware)
-
-# ---------------------------------------------------------------------------
-# Routers
-# ---------------------------------------------------------------------------
-app.include_router(shared.router)
-app.include_router(client.router)
-app.include_router(server.router)
-app.include_router(logs.router)
-
-
-@app.get("/")
-async def root():
-    return {"message": "Parasite Private Server", "version": "2.0.0"}
-
-
-# ---------------------------------------------------------------------------
-# Startup
-# ---------------------------------------------------------------------------
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # 1. Initialise SQLite tables
     await db.init_db()
     logger.info("[INIT] Database ready.")
@@ -68,6 +46,28 @@ async def startup_event():
         open_port(8000, "TCP", "Parasite API")
     else:
         logger.info("[INIT] UPnP disabled.")
+        
+    yield
+
+app = FastAPI(title="Parasite Private Server", version="2.0.0", lifespan=lifespan)
+
+# ---------------------------------------------------------------------------
+# Middleware
+# ---------------------------------------------------------------------------
+app.middleware("http")(log_requests_middleware)
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
+app.include_router(shared.router)
+app.include_router(client.router)
+app.include_router(server.router)
+app.include_router(logs.router)
+
+
+@app.get("/")
+async def root():
+    return {"message": "Parasite Private Server", "version": "2.0.0"}
 
 
 # ---------------------------------------------------------------------------

@@ -243,6 +243,7 @@ class ServerHeartbeatRequest(Request):
 
 class ServerShutdownRequest(Request):
     sessionId: str
+    reason: Optional[str] = None
 
 # --- Response Wrappers ---
 

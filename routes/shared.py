@@ -1,19 +1,27 @@
 import logging
+
+import database as db
+from catalog import Catalog
 from fastapi import APIRouter
 from models import (
     AbilitiesGetResponse,
     CharactersGetResponse,
+    GamesStatsGetRequest,
+    GamesStatsGetResponse,
     ItemsGetResponse,
+    LevelData,
+    LevelsGetResponse,
+    MatchInfoRequest,
+    MatchInfoResponse,
     PerksGetResponse,
+    PlayersGamesGetData,
+    PlayersGamesGetRequest,
+    PlayersGamesGetResponse,
+    RegionData,
     SkinsGetResponse,
-    LevelsGetResponse, LevelData,
-    VersionCheckRequest, VersionCheckResponse,
-    MatchInfoRequest, MatchInfoResponse, RegionData,
-    PlayersGamesGetRequest, PlayersGamesGetResponse, PlayersGamesGetData,
-    GamesStatsGetRequest, GamesStatsGetResponse, GameStatsGetData,
+    VersionCheckRequest,
+    VersionCheckResponse,
 )
-from catalog import Catalog
-import database as db
 
 logger = logging.getLogger("SharedRoutes")
 router = APIRouter()

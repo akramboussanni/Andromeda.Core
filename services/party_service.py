@@ -38,18 +38,20 @@ def create_party(
     party_name: str,
     is_public: bool,
     host_steam_id: str,
+    max_players: int = 8,
     port: int = 0,
     ip_address: Optional[str] = None,
+    game_id: Optional[str] = None,
 ) -> tuple[str, dict]:
     """
     Register a new party.  Returns (game_id, party_dict).
     Port 0 means the dedicated server hasn't reported in yet.
     """
-    game_id = str(uuid.uuid4())
+    game_id = game_id or str(uuid.uuid4())
     _parties[game_id] = {
         "region": region,
         "partyName": party_name,
-        "maxPlayers": 6,
+        "maxPlayers": max_players,
         "isPublic": is_public,
         "hostSteamId": host_steam_id,
         "players": {host_steam_id: False},
@@ -102,14 +104,11 @@ def leave_party(game_id: str, steam_id: str) -> bool:
         return False
     party["players"].pop(steam_id, None)
 
+    # Migrate host if the host left and others remain
     if steam_id == party["hostSteamId"]:
-        remaining = [s for s in party["players"] if s != steam_id]
-        if remaining:
-            party["hostSteamId"] = remaining[0]
-            logger.info(f"[PARTY] {game_id}: host migrated to {party['hostSteamId']}")
-        else:
-            close_party(game_id)
-            return True
+        party["hostSteamId"] = list(party["players"].keys())[0]
+        logger.info(f"[PARTY] {game_id}: host migrated to {party['hostSteamId']}")
+        
     return True
 
 
@@ -138,6 +137,14 @@ def heartbeat(game_id: str) -> bool:
         return False
     party["lastHeartbeat"] = time.time()
     return True
+
+
+def find_party_by_player(steam_id: str) -> Optional[str]:
+    """Find the game_id of the party containing the given player."""
+    for gid, party in _parties.items():
+        if steam_id in party["players"]:
+            return gid
+    return None
 
 
 def close_party(game_id: str):

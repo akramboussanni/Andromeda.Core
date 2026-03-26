@@ -22,6 +22,15 @@ HEARTBEAT_TIMEOUT = int(os.getenv("PARTY_HEARTBEAT_TIMEOUT", "90"))
 _SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1")
 
 
+def _default_server_host() -> str:
+    # Late import avoids circular import at module load time.
+    try:
+        from services.game_server_service import get_server_host
+        return get_server_host()
+    except Exception:
+        return _SERVER_HOST
+
+
 def _make_join_data(game_id: str, party: dict) -> JoinData:
     return JoinData(
         ipAddress=party["ipAddress"],
@@ -58,7 +67,7 @@ def create_party(
         "isPublic": is_public,
         "hostSteamId": host_steam_id,
         "players": {host_steam_id: False},
-        "ipAddress": ip_address or _SERVER_HOST,
+        "ipAddress": ip_address or _default_server_host(),
         "port": port,
         "voicePort": voice_port,
         "status": "pending" if port == 0 else "ready",

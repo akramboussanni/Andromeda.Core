@@ -25,13 +25,20 @@ Andromeda.Core is the control-plane API for matchmaking, party lifecycle, player
 - GAME_HOST_API_BASE_URL
 - GAME_HOST_API_TOKEN
 - GAME_HOST_API_TIMEOUT_SECONDS
-- GAME_HOST_BOOT_PROVIDER=none|webhook|hetzner
+- GAME_HOST_BOOT_PROVIDER=none|webhook|gcloud
 - GAME_HOST_BOOT_TRIGGER_URL
 - GAME_HOST_BOOT_TRIGGER_TOKEN
+- GCP_PROJECT_ID
+- GCP_ZONE
+- GCP_INSTANCE_NAME
+- GCP_ACCESS_TOKEN (optional; if omitted, metadata service token is used)
+- GCP_API_TIMEOUT_SECONDS
+- GCP_RESOLVE_IP_ON_BOOT
 - GAME_HOST_BOOT_RETRY_SECONDS
 - GAME_HOST_BOOT_WARMUP_SECONDS
 - MANAGED_ZIP_PATH
 - MANAGED_ZIP_TOKEN
+- EOB_MANAGED_DEP_DIR (fallback source dir for building managed zip)
 
 ## Local development
 

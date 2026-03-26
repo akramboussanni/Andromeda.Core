@@ -1,5 +1,7 @@
 import logging
 import os
+import shutil
+import tempfile
 import time
 from datetime import datetime
 from typing import Optional
@@ -19,14 +21,57 @@ from models import (
 )
 from services.game_server_service import (
     get_host_boot_state,
+    get_server_host,
     get_session_ports,
     stop_session,
 )
+from starlette.background import BackgroundTask
 
 logger = logging.getLogger("ServerRoutes")
 router = APIRouter()
 MANAGED_ZIP_PATH = os.getenv("MANAGED_ZIP_PATH", os.path.join("data", "managed", "EnemyOnBoard_Managed.zip"))
 MANAGED_ZIP_TOKEN = os.getenv("MANAGED_ZIP_TOKEN", "").strip()
+EOB_MANAGED_DEP_DIR = os.getenv("EOB_MANAGED_DEP_DIR", "").strip() or os.getenv("EOB_MANAGED_DIR", "").strip()
+
+
+def _cleanup_file(path: str):
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except Exception as exc:
+        logger.warning(f"[MANAGED-ZIP] Failed to delete temporary zip '{path}': {exc}")
+
+
+def _resolve_managed_zip_for_ci() -> tuple[str, Optional[BackgroundTask]]:
+    # Primary mode: explicit zip path, backwards compatible with current setup.
+    resolved_zip = os.path.abspath(MANAGED_ZIP_PATH)
+    if os.path.exists(resolved_zip):
+        return resolved_zip, None
+
+    # CI fallback: build a zip from the game Managed directory on demand.
+    if EOB_MANAGED_DEP_DIR:
+        managed_dir = os.path.abspath(EOB_MANAGED_DEP_DIR)
+        if not os.path.isdir(managed_dir):
+            raise HTTPException(
+                status_code=500,
+                detail=f"EOB_MANAGED_DEP_DIR does not exist or is not a directory: {managed_dir}",
+            )
+
+        expected = os.path.join(managed_dir, "Assembly-CSharp-Publicized.dll")
+        if not os.path.exists(expected):
+            raise HTTPException(
+                status_code=500,
+                detail="Managed dependency source is missing Assembly-CSharp-Publicized.dll",
+            )
+
+        temp_base = os.path.join(
+            tempfile.gettempdir(),
+            f"andromeda_eob_managed_{int(time.time())}",
+        )
+        temp_zip = shutil.make_archive(temp_base, "zip", managed_dir)
+        return temp_zip, BackgroundTask(_cleanup_file, temp_zip)
+
+    raise HTTPException(status_code=404, detail="Managed zip not found")
 
 
 @router.post("/server/ready", response_model=Response)
@@ -39,7 +84,7 @@ async def server_ready(req: ServerReadyRequest):
     logger.info(
         f"[SERVER-READY] session={req.sessionId} port={req.port} region={req.region}"
     )
-    host = os.getenv("SERVER_HOST", "127.0.0.1")
+    host = get_server_host()
     ps.update_party_address(req.sessionId, host, req.port)
     ps.heartbeat(req.sessionId)
     return Response()
@@ -85,14 +130,13 @@ async def build_managed_zip(
         if provided != MANAGED_ZIP_TOKEN:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
-    resolved = os.path.abspath(MANAGED_ZIP_PATH)
-    if not os.path.exists(resolved):
-        raise HTTPException(status_code=404, detail="Managed zip not found")
+    resolved, cleanup_task = _resolve_managed_zip_for_ci()
 
     return FileResponse(
         path=resolved,
         filename=os.path.basename(resolved),
         media_type="application/zip",
+        background=cleanup_task,
     )
 
 

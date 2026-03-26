@@ -8,6 +8,7 @@ import threading
 import time
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 
 logger = logging.getLogger("GameServerService")
 
@@ -22,8 +23,12 @@ HOST_API_TOKEN = os.getenv("GAME_HOST_API_TOKEN", "").strip()
 HOST_API_TIMEOUT_SECONDS = int(os.getenv("GAME_HOST_API_TIMEOUT_SECONDS", "8"))
 BOOT_TRIGGER_URL = os.getenv("GAME_HOST_BOOT_TRIGGER_URL", "").strip()
 BOOT_TRIGGER_TOKEN = os.getenv("GAME_HOST_BOOT_TRIGGER_TOKEN", "").strip()
-HETZNER_API_TOKEN = os.getenv("HETZNER_API_TOKEN", "").strip()
-HETZNER_SERVER_ID = os.getenv("HETZNER_SERVER_ID", "").strip()
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "").strip()
+GCP_ZONE = os.getenv("GCP_ZONE", "").strip()
+GCP_INSTANCE_NAME = os.getenv("GCP_INSTANCE_NAME", "").strip()
+GCP_ACCESS_TOKEN = os.getenv("GCP_ACCESS_TOKEN", "").strip()
+GCP_API_TIMEOUT_SECONDS = int(os.getenv("GCP_API_TIMEOUT_SECONDS", "10"))
+GCP_RESOLVE_IP_ON_BOOT = os.getenv("GCP_RESOLVE_IP_ON_BOOT", "true").strip().lower() in ("1", "true", "yes", "on")
 BOOT_PROVIDER = os.getenv("GAME_HOST_BOOT_PROVIDER", "none").strip().lower()
 GAME_RUNTIME_MODE = os.getenv("GAME_RUNTIME_MODE", "process").strip().lower()
 PORT_RANGE_START = int(os.getenv("GAME_PORT_RANGE_START", "7777"))
@@ -39,6 +44,8 @@ BOOT_WAIT_MESSAGE = os.getenv("GAME_HOST_BOOT_WAIT_MESSAGE", "Please wait a litt
 _boot_lock = threading.Lock()
 _last_boot_request_at = 0.0
 _warm_until = 0.0
+_resolved_server_host = SERVER_HOST
+_resolved_server_host_at = 0.0
 _port_lock = threading.Lock()
 _used_ports = set()
 _session_runtime = {}
@@ -49,6 +56,12 @@ def get_boot_wait_message() -> str:
 
 
 def get_host_boot_state() -> dict:
+    if BOOT_PROVIDER == "gcloud":
+        now = time.time()
+        # Keep the cached host reasonably fresh for reporting endpoints.
+        if now - _resolved_server_host_at > 30:
+            _refresh_server_host_from_gcloud()
+
     with _boot_lock:
         now = time.time()
         exe_present = os.path.exists(GAME_EXE)
@@ -60,8 +73,24 @@ def get_host_boot_state() -> dict:
             "provider": BOOT_PROVIDER,
             "lastBootRequestAt": _last_boot_request_at,
             "warmUntil": _warm_until,
+            "serverHost": _resolved_server_host,
+            "serverHostResolvedAt": _resolved_server_host_at,
             "message": BOOT_WAIT_MESSAGE,
         }
+
+
+def get_server_host(force_refresh: bool = False) -> str:
+    """Return the best-known reachable host/IP used by clients to connect to sessions."""
+    if force_refresh and BOOT_PROVIDER == "gcloud":
+        _refresh_server_host_from_gcloud()
+    return _resolved_server_host
+
+
+def _set_resolved_server_host(host: str):
+    global _resolved_server_host, _resolved_server_host_at
+    if host:
+        _resolved_server_host = host
+        _resolved_server_host_at = time.time()
 
 
 def _host_api_headers() -> dict:
@@ -112,11 +141,11 @@ def _trigger_boot_request_if_needed() -> bool:
         logger.warning("[GAMESERVER] GAME_HOST_BOOT_PROVIDER=webhook but GAME_HOST_BOOT_TRIGGER_URL is empty")
         return False
 
-    if provider == "hetzner" and (not HETZNER_API_TOKEN or not HETZNER_SERVER_ID):
-        logger.warning("[GAMESERVER] GAME_HOST_BOOT_PROVIDER=hetzner but HETZNER_API_TOKEN/HETZNER_SERVER_ID are missing")
+    if provider == "gcloud" and (not GCP_PROJECT_ID or not GCP_ZONE or not GCP_INSTANCE_NAME):
+        logger.warning("[GAMESERVER] GAME_HOST_BOOT_PROVIDER=gcloud but GCP_PROJECT_ID/GCP_ZONE/GCP_INSTANCE_NAME are missing")
         return False
 
-    if provider not in ("webhook", "hetzner"):
+    if provider not in ("webhook", "gcloud"):
         logger.warning(f"[GAMESERVER] Unknown GAME_HOST_BOOT_PROVIDER={provider}")
         return False
 
@@ -136,15 +165,10 @@ def _trigger_boot_request_if_needed() -> bool:
                     if resp.status < 200 or resp.status >= 300:
                         logger.warning(f"[GAMESERVER] Boot trigger returned HTTP {resp.status}")
                         return False
-            elif provider == "hetzner":
-                hetzner_url = f"https://api.hetzner.cloud/v1/servers/{HETZNER_SERVER_ID}/actions/poweron"
-                req = urlrequest.Request(hetzner_url, method="POST")
-                req.add_header("Authorization", f"Bearer {HETZNER_API_TOKEN}")
-                req.add_header("Content-Type", "application/json")
-                with urlrequest.urlopen(req, data=b"{}", timeout=10) as resp:
-                    if resp.status < 200 or resp.status >= 300:
-                        logger.warning(f"[GAMESERVER] Hetzner poweron returned HTTP {resp.status}")
-                        return False
+            elif provider == "gcloud":
+                _gcloud_start_instance()
+                if GCP_RESOLVE_IP_ON_BOOT:
+                    _refresh_server_host_from_gcloud()
 
             _last_boot_request_at = now
             _warm_until = now + BOOT_WARMUP_SECONDS
@@ -166,6 +190,102 @@ def _trigger_boot_request_if_needed() -> bool:
         except Exception as exc:
             logger.error(f"[GAMESERVER] Unexpected boot trigger error: {exc}")
             return False
+
+
+def _gcp_instance_base_url() -> str:
+    project = quote(GCP_PROJECT_ID, safe="")
+    zone = quote(GCP_ZONE, safe="")
+    instance = quote(GCP_INSTANCE_NAME, safe="")
+    return f"https://compute.googleapis.com/compute/v1/projects/{project}/zones/{zone}/instances/{instance}"
+
+
+def _gcp_metadata_access_token() -> str:
+    req = urlrequest.Request(
+        "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+        method="GET",
+    )
+    req.add_header("Metadata-Flavor", "Google")
+    with urlrequest.urlopen(req, timeout=GCP_API_TIMEOUT_SECONDS) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+        return str(payload.get("access_token", "")).strip()
+
+
+def _gcp_access_token() -> str:
+    if GCP_ACCESS_TOKEN:
+        return GCP_ACCESS_TOKEN
+    return _gcp_metadata_access_token()
+
+
+def _gcp_request(method: str, path_suffix: str = "", payload: dict | None = None) -> tuple[int, dict | None]:
+    token = _gcp_access_token()
+    if not token:
+        raise RuntimeError("No GCP access token available")
+
+    url = f"{_gcp_instance_base_url()}{path_suffix}"
+    body = None if payload is None else json.dumps(payload).encode("utf-8")
+    req = urlrequest.Request(url, data=body, method=method)
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urlrequest.urlopen(req, timeout=GCP_API_TIMEOUT_SECONDS) as resp:
+            text = resp.read().decode("utf-8") if resp.length != 0 else ""
+            data = _try_parse_json(text)
+            return resp.status, data
+    except HTTPError as exc:
+        text = exc.read().decode("utf-8") if exc.fp else ""
+        data = _try_parse_json(text)
+        return exc.code, data
+
+
+def _extract_gcp_external_ip(instance_data: dict | None) -> str | None:
+    if not isinstance(instance_data, dict):
+        return None
+    nics = instance_data.get("networkInterfaces")
+    if not isinstance(nics, list):
+        return None
+    for nic in nics:
+        if not isinstance(nic, dict):
+            continue
+        access_configs = nic.get("accessConfigs")
+        if not isinstance(access_configs, list):
+            continue
+        for cfg in access_configs:
+            if not isinstance(cfg, dict):
+                continue
+            ip = cfg.get("natIP")
+            if isinstance(ip, str) and ip.strip():
+                return ip.strip()
+    return None
+
+
+def _refresh_server_host_from_gcloud() -> str | None:
+    try:
+        status, data = _gcp_request("GET")
+        if status != 200:
+            logger.warning(f"[GAMESERVER] GCP instance GET failed status={status} data={data}")
+            return None
+        ip = _extract_gcp_external_ip(data)
+        if not ip:
+            logger.warning("[GAMESERVER] GCP instance has no external natIP")
+            return None
+        _set_resolved_server_host(ip)
+        return ip
+    except Exception as exc:
+        logger.warning(f"[GAMESERVER] Failed to refresh server host from GCP: {exc}")
+        return None
+
+
+def _gcloud_start_instance() -> bool:
+    status, data = _gcp_request("POST", "/start", payload={})
+    if status in (200, 202):
+        return True
+    if status == 400 and isinstance(data, dict):
+        # API often reports "already running" as a 400 with explanatory message.
+        msg = json.dumps(data).lower()
+        if "already" in msg and "running" in msg:
+            return True
+    raise RuntimeError(f"GCP start instance failed status={status} data={data}")
 
 
 def _is_port_available(port: int) -> bool:
@@ -263,6 +383,8 @@ def spawn_server(
             if status == 200 and data:
                 game_port = int(data.get("gamePort", 0))
                 voice_port = int(data.get("voicePort", game_port + 1 if game_port > 0 else 0))
+                if BOOT_PROVIDER == "gcloud":
+                    _refresh_server_host_from_gcloud()
                 _session_runtime[session_id] = {
                     "runtime": "host-api",
                     "gamePort": game_port,

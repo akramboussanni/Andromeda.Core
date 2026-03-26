@@ -1,4 +1,5 @@
 from typing import List, Optional
+
 from pydantic import BaseModel
 
 # --- Shared Models ---
@@ -73,6 +74,7 @@ class RegionData(BaseModel):
 class JoinData(BaseModel):
     ipAddress: str
     port: int
+    voicePort: Optional[int] = None
     sessionId: str
 
 class GamemodeData(BaseModel):

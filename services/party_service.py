@@ -1,8 +1,9 @@
+import logging
 import os
 import time
 import uuid
-import logging
 from typing import Dict, List, Optional
+
 from models import JoinData, PartyListResponseData
 
 logger = logging.getLogger("PartyService")
@@ -25,6 +26,7 @@ def _make_join_data(game_id: str, party: dict) -> JoinData:
     return JoinData(
         ipAddress=party["ipAddress"],
         port=party["port"],
+        voicePort=party.get("voicePort"),
         sessionId=game_id,
     )
 
@@ -40,6 +42,7 @@ def create_party(
     host_steam_id: str,
     max_players: int = 8,
     port: int = 0,
+    voice_port: int = 0,
     ip_address: Optional[str] = None,
     game_id: Optional[str] = None,
 ) -> tuple[str, dict]:
@@ -57,6 +60,7 @@ def create_party(
         "players": {host_steam_id: False},
         "ipAddress": ip_address or _SERVER_HOST,
         "port": port,
+        "voicePort": voice_port,
         "status": "pending" if port == 0 else "ready",
         "lastHeartbeat": time.time(),
     }
@@ -70,6 +74,7 @@ def update_party_address(game_id: str, ip_address: str, port: int):
     if party:
         party["ipAddress"] = ip_address
         party["port"] = port
+        party["voicePort"] = port + 1
         party["status"] = "ready"
         party["lastHeartbeat"] = time.time()
         logger.info(f"[PARTY] {game_id} now ready at {ip_address}:{port}")
@@ -103,6 +108,16 @@ def leave_party(game_id: str, steam_id: str) -> bool:
     if not party:
         return False
     party["players"].pop(steam_id, None)
+
+    if not party["players"]:
+        logger.info(f"[PARTY] {game_id}: empty party, closing runtime")
+        try:
+            from services.game_server_service import stop_session
+            stop_session(game_id, reason="empty-party")
+        except Exception as exc:
+            logger.warning(f"[PARTY] Failed to stop empty-party runtime for {game_id}: {exc}")
+        _parties.pop(game_id, None)
+        return True
 
     # Migrate host if the host left and others remain
     if steam_id == party["hostSteamId"]:
@@ -183,4 +198,9 @@ def _cleanup_stale():
     ]
     for gid in stale:
         logger.info(f"[PARTY] Removing stale party {gid}")
+        try:
+            from services.game_server_service import stop_session
+            stop_session(gid, reason="stale-timeout")
+        except Exception as exc:
+            logger.warning(f"[PARTY] Failed to stop stale runtime session for {gid}: {exc}")
         _parties.pop(gid, None)

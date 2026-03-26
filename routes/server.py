@@ -1,19 +1,32 @@
 import logging
+import os
 import time
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter
-from models import (
-    StatsNewRequest, StatsNewResponse, StatsNewResponsePlayer,
-    ServerReadyRequest, ServerHeartbeatRequest, ServerShutdownRequest,
-    Response,
-)
-import services.party_service as ps
 import database as db
+import services.party_service as ps
+from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import FileResponse
+from models import (
+    Response,
+    ServerHeartbeatRequest,
+    ServerReadyRequest,
+    ServerShutdownRequest,
+    StatsNewRequest,
+    StatsNewResponse,
+    StatsNewResponsePlayer,
+)
+from services.game_server_service import (
+    get_host_boot_state,
+    get_session_ports,
+    stop_session,
+)
 
 logger = logging.getLogger("ServerRoutes")
 router = APIRouter()
+MANAGED_ZIP_PATH = os.getenv("MANAGED_ZIP_PATH", os.path.join("data", "managed", "EnemyOnBoard_Managed.zip"))
+MANAGED_ZIP_TOKEN = os.getenv("MANAGED_ZIP_TOKEN", "").strip()
 
 
 @router.post("/server/ready", response_model=Response)
@@ -26,11 +39,15 @@ async def server_ready(req: ServerReadyRequest):
     logger.info(
         f"[SERVER-READY] session={req.sessionId} port={req.port} region={req.region}"
     )
-    import os
     host = os.getenv("SERVER_HOST", "127.0.0.1")
     ps.update_party_address(req.sessionId, host, req.port)
     ps.heartbeat(req.sessionId)
     return Response()
+
+
+@router.get("/server/host/status", response_model=Response)
+async def server_host_status():
+    return Response(data=get_host_boot_state())
 
 
 @router.post("/server/heartbeat", response_model=Response)
@@ -44,8 +61,39 @@ async def server_heartbeat(req: ServerHeartbeatRequest):
 async def server_shutdown(req: ServerShutdownRequest):
     reason_str = req.reason or "Unknown / Closed manually"
     logger.info(f"[SERVER-SHUTDOWN] session={req.sessionId} reason={reason_str}")
+    stop_session(req.sessionId, reason=reason_str)
     ps.close_party(req.sessionId)
     return Response()
+
+
+@router.get("/server/session/{session_id}/ports", response_model=Response)
+async def server_session_ports(session_id: str):
+    ports = get_session_ports(session_id)
+    if not ports:
+        return Response(status=404, message="Session not found", data=None)
+    return Response(data=ports)
+
+
+@router.get("/build/managed-zip")
+async def build_managed_zip(
+    authorization: Optional[str] = Header(None),
+    x_managed_token: Optional[str] = Header(None, alias="X-Managed-Token"),
+):
+    if MANAGED_ZIP_TOKEN:
+        bearer = (authorization or "").removeprefix("Bearer ").strip()
+        provided = x_managed_token or bearer
+        if provided != MANAGED_ZIP_TOKEN:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    resolved = os.path.abspath(MANAGED_ZIP_PATH)
+    if not os.path.exists(resolved):
+        raise HTTPException(status_code=404, detail="Managed zip not found")
+
+    return FileResponse(
+        path=resolved,
+        filename=os.path.basename(resolved),
+        media_type="application/zip",
+    )
 
 
 @router.post("/stats/new", response_model=StatsNewResponse)

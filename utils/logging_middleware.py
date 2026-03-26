@@ -1,10 +1,10 @@
+import json
+import logging
+
 from fastapi import Request
 from starlette.concurrency import iterate_in_threadpool
-import logging
-import json
-import socket
 
-logger = logging.getLogger("PythonServer")
+logger = logging.getLogger("Andromeda.Core")
 
 async def log_requests_middleware(request: Request, call_next):
     # Skip logging for log polling endpoints to avoid spam

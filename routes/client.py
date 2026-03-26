@@ -44,12 +44,13 @@ from models import (
     PlayersGetResponse,
     Response,
 )
-from services.game_server_service import spawn_server
+from services.game_server_service import get_boot_wait_message, spawn_server
 from services.progression_service import ProgressionService
 from services.user_service import UserService
 
 logger = logging.getLogger("ClientRoutes")
 router = APIRouter()
+BOOT_WAIT_MESSAGE = get_boot_wait_message()
 
 
 # Prevent duplicate server spawns from repeated create requests
@@ -212,12 +213,36 @@ async def party_create(
         is_public=request.isPublic,
     )
 
+    if port == -2:
+        _, pending_party = ps.create_party(
+            region=request.region,
+            party_name=request.partyName,
+            is_public=request.isPublic,
+            host_steam_id=steam_id,
+            port=0,
+            game_id=game_id,
+        )
+        return PartyCreateResponse(
+            status=503,
+            message=BOOT_WAIT_MESSAGE,
+            data=JoinData(
+                ipAddress=pending_party["ipAddress"],
+                port=pending_party["port"],
+                voicePort=pending_party.get("voicePort"),
+                sessionId=game_id,
+            ),
+        )
+
+    if port == -1:
+        return PartyCreateResponse(status=500, message="Failed to spawn server", data=None)
+
     _, party = ps.create_party(
         region=request.region,
         party_name=request.partyName,
         is_public=request.isPublic,
         host_steam_id=steam_id,
         port=port if port > 0 else 0,
+        voice_port=(port + 1) if port > 0 else 0,
         game_id=game_id,
     )
 
@@ -227,6 +252,7 @@ async def party_create(
         data=JoinData(
             ipAddress=party["ipAddress"],
             port=party["port"],
+            voicePort=party.get("voicePort"),
             sessionId=game_id,
         )
     )
@@ -385,6 +411,7 @@ async def games_new(
                 data=JoinData(
                     ipAddress=party["ipAddress"],
                     port=party["port"],
+                    voicePort=party.get("voicePort"),
                     sessionId=recent_global_game_id,
                 )
             )
@@ -400,6 +427,7 @@ async def games_new(
                 data=JoinData(
                     ipAddress=party["ipAddress"],
                     port=party["port"],
+                    voicePort=party.get("voicePort"),
                     sessionId=recent_game_id,
                 )
             )
@@ -416,10 +444,11 @@ async def games_new(
                     data=JoinData(
                         ipAddress=party["ipAddress"],
                         port=party["port"],
+                        voicePort=party.get("voicePort"),
                         sessionId=in_progress_global_game_id,
                     )
                 )
-        return GamesNewResponse(status=429, message="Global game server spawn in progress", data=None)
+        return GamesNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
 
     if not _begin_spawn(spawn_key):
         in_progress_game_id = _find_recent_spawn(spawn_key)
@@ -433,11 +462,12 @@ async def games_new(
                     data=JoinData(
                         ipAddress=party["ipAddress"],
                         port=party["port"],
+                        voicePort=party.get("voicePort"),
                         sessionId=in_progress_game_id,
                     )
                 )
         _end_global_spawn(global_spawn_key)
-        return GamesNewResponse(status=429, message="Game server spawn in progress", data=None)
+        return GamesNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
 
     try:
         session_id = str(uuid.uuid4())
@@ -449,6 +479,8 @@ async def games_new(
             gamemode=req.gamemodeName,
             gamemode_data=req.gamemodeData,
         )
+        if port == -2:
+            return GamesNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
         if port == -1:
             return GamesNewResponse(status=500, message="Failed to spawn server", data=None)
 
@@ -461,12 +493,18 @@ async def games_new(
             host_steam_id="server",
             max_players=req.maxPlayers,
             port=port,
+            voice_port=(port + 1),
             game_id=session_id,
         )
         _remember_spawn(spawn_key, game_id)
         _remember_global_spawn(global_spawn_key, game_id)
         return GamesNewResponse(
-            data=JoinData(ipAddress=party["ipAddress"], port=port, sessionId=game_id)
+            data=JoinData(
+                ipAddress=party["ipAddress"],
+                port=port,
+                voicePort=party.get("voicePort") or ((port + 1) if port > 0 else None),
+                sessionId=game_id,
+            )
         )
     finally:
         _end_spawn(spawn_key)
@@ -484,7 +522,7 @@ async def games_join(request: GamesJoinRequest, authorization: Optional[str] = H
     # backoff) keeps polling until /server/ready has been called.
     if join_data.port == 0:
         logger.info(f"[GAMES-JOIN] Game {request.gameId} server not ready yet (port=0), client will retry")
-        return GamesJoinResponse(status=404, message="Game server is starting up, please retry", data=None)
+        return GamesJoinResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
     logger.info(f"[GAMES-JOIN] Directing {steam_id} to {join_data.ipAddress}:{join_data.port} for game {request.gameId}")
     return GamesJoinResponse(data=join_data)
 
@@ -520,7 +558,7 @@ async def games_custom_new(
                 f"[SPAWN-DEDUPE] Returning in-flight /games/custom/new spawn for key={spawn_key} game={in_progress_game_id}"
             )
             return GamesCustomNewResponse(data=in_progress_game_id)
-        return GamesCustomNewResponse(status=429, message="Game server spawn in progress", data=None)
+        return GamesCustomNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
 
     try:
         session_id = str(uuid.uuid4())
@@ -532,6 +570,8 @@ async def games_custom_new(
             gamemode=req.gamemodeName,
             gamemode_data=req.gamemodeData,
         )
+        if port == -2:
+            return GamesCustomNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
         if port == -1:
             return GamesCustomNewResponse(status=500, message="Executable not found", data=None)
 
@@ -542,6 +582,7 @@ async def games_custom_new(
             host_steam_id="server",
             max_players=req.maxPlayers,
             port=port,
+            voice_port=(port + 1),
             game_id=session_id,
         )
         _remember_spawn(spawn_key, session_id)

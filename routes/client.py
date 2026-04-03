@@ -202,60 +202,103 @@ def _end_global_spawn(global_spawn_key: str):
 async def party_create(
     request: PartyCreateRequest, authorization: Optional[str] = Header(None)
 ):
+    spawn_key = _build_spawn_key(
+        endpoint="party/create",
+        region=request.region,
+        source_session_id=None,
+        authorization=authorization,
+        game_mode="CustomParty",
+        is_public=request.isPublic,
+        max_players=8,
+    )
+
+    recent_game_id = _find_recent_spawn(spawn_key)
+    if recent_game_id:
+        party = ps.get_party(recent_game_id)
+        if party:
+            return PartyCreateResponse(
+                data=JoinData(
+                    ipAddress=party["ipAddress"],
+                    port=party["port"],
+                    voicePort=party.get("voicePort"),
+                    sessionId=recent_game_id,
+                )
+            )
+
+    if not _begin_spawn(spawn_key):
+        in_progress_game_id = _find_recent_spawn(spawn_key)
+        if in_progress_game_id:
+            party = ps.get_party(in_progress_game_id)
+            if party:
+                return PartyCreateResponse(
+                    data=JoinData(
+                        ipAddress=party["ipAddress"],
+                        port=party["port"],
+                        voicePort=party.get("voicePort"),
+                        sessionId=in_progress_game_id,
+                    )
+                )
+        return PartyCreateResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
+
     steam_id = await auth.get_steam_id(_auth_hdr(authorization))
     game_id = str(uuid.uuid4())
 
-    # Spawn a dedicated server (async — it will call /server/ready when ready)
-    port = spawn_server(
-        region=request.region,
-        name=request.partyName,
-        session_id=game_id,
-        is_public=request.isPublic,
-    )
+    try:
+        # Spawn a dedicated server (async — it will call /server/ready when ready)
+        port = spawn_server(
+            region=request.region,
+            name=request.partyName,
+            session_id=game_id,
+            is_public=request.isPublic,
+        )
 
-    if port == -2:
-        _, pending_party = ps.create_party(
+        if port == -2:
+            _, pending_party = ps.create_party(
+                region=request.region,
+                party_name=request.partyName,
+                is_public=request.isPublic,
+                host_steam_id=steam_id,
+                port=0,
+                game_id=game_id,
+            )
+            _remember_spawn(spawn_key, game_id)
+            return PartyCreateResponse(
+                status=200,
+                message=BOOT_WAIT_MESSAGE,
+                data=JoinData(
+                    ipAddress=pending_party["ipAddress"],
+                    port=pending_party["port"],
+                    voicePort=pending_party.get("voicePort"),
+                    sessionId=game_id,
+                ),
+            )
+
+        if port == -1:
+            return PartyCreateResponse(status=500, message="Failed to spawn server", data=None)
+
+        _, party = ps.create_party(
             region=request.region,
             party_name=request.partyName,
             is_public=request.isPublic,
             host_steam_id=steam_id,
-            port=0,
+            port=port if port > 0 else 0,
+            voice_port=(port + 1) if port > 0 else 0,
             game_id=game_id,
         )
+        _remember_spawn(spawn_key, game_id)
+
+        # If the exe wasn't found (port=-1), still create the party in pending state
+        # so the game client can poll for it.
         return PartyCreateResponse(
-            status=503,
-            message=BOOT_WAIT_MESSAGE,
             data=JoinData(
-                ipAddress=pending_party["ipAddress"],
-                port=pending_party["port"],
-                voicePort=pending_party.get("voicePort"),
+                ipAddress=party["ipAddress"],
+                port=party["port"],
+                voicePort=party.get("voicePort"),
                 sessionId=game_id,
-            ),
+            )
         )
-
-    if port == -1:
-        return PartyCreateResponse(status=500, message="Failed to spawn server", data=None)
-
-    _, party = ps.create_party(
-        region=request.region,
-        party_name=request.partyName,
-        is_public=request.isPublic,
-        host_steam_id=steam_id,
-        port=port if port > 0 else 0,
-        voice_port=(port + 1) if port > 0 else 0,
-        game_id=game_id,
-    )
-
-    # If the exe wasn't found (port=-1), still create the party in pending state
-    # so the game client can poll for it.
-    return PartyCreateResponse(
-        data=JoinData(
-            ipAddress=party["ipAddress"],
-            port=party["port"],
-            voicePort=party.get("voicePort"),
-            sessionId=game_id,
-        )
-    )
+    finally:
+        _end_spawn(spawn_key)
 
 
 @router.post("/party/join", response_model=PartyJoinResponse)
@@ -404,9 +447,6 @@ async def games_new(
     if recent_global_game_id:
         party = ps.get_party(recent_global_game_id)
         if party:
-            logger.warning(
-                f"[SPAWN-DEDUPE] Reusing recent global /games/new spawn for key={global_spawn_key} game={recent_global_game_id}"
-            )
             return GamesNewResponse(
                 data=JoinData(
                     ipAddress=party["ipAddress"],
@@ -420,9 +460,6 @@ async def games_new(
     if recent_game_id:
         party = ps.get_party(recent_game_id)
         if party:
-            logger.warning(
-                f"[SPAWN-DEDUPE] Reusing recent /games/new spawn for key={spawn_key} game={recent_game_id}"
-            )
             return GamesNewResponse(
                 data=JoinData(
                     ipAddress=party["ipAddress"],
@@ -437,9 +474,6 @@ async def games_new(
         if in_progress_global_game_id:
             party = ps.get_party(in_progress_global_game_id)
             if party:
-                logger.warning(
-                    f"[SPAWN-DEDUPE] Returning in-flight global /games/new spawn for key={global_spawn_key} game={in_progress_global_game_id}"
-                )
                 return GamesNewResponse(
                     data=JoinData(
                         ipAddress=party["ipAddress"],
@@ -455,9 +489,6 @@ async def games_new(
         if in_progress_game_id:
             party = ps.get_party(in_progress_game_id)
             if party:
-                logger.warning(
-                    f"[SPAWN-DEDUPE] Returning in-flight /games/new spawn for key={spawn_key} game={in_progress_game_id}"
-                )
                 return GamesNewResponse(
                     data=JoinData(
                         ipAddress=party["ipAddress"],
@@ -546,17 +577,11 @@ async def games_custom_new(
 
     recent_game_id = _find_recent_spawn(spawn_key)
     if recent_game_id:
-        logger.warning(
-            f"[SPAWN-DEDUPE] Reusing recent /games/custom/new spawn for key={spawn_key} game={recent_game_id}"
-        )
         return GamesCustomNewResponse(data=recent_game_id)
 
     if not _begin_spawn(spawn_key):
         in_progress_game_id = _find_recent_spawn(spawn_key)
         if in_progress_game_id:
-            logger.warning(
-                f"[SPAWN-DEDUPE] Returning in-flight /games/custom/new spawn for key={spawn_key} game={in_progress_game_id}"
-            )
             return GamesCustomNewResponse(data=in_progress_game_id)
         return GamesCustomNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
 

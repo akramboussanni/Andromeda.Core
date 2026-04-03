@@ -29,3 +29,5 @@ logging.txt
 .tox/
 
 EnemyOnBoard_Managed.zip
+
+gcloud_creds.json

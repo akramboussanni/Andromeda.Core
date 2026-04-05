@@ -87,6 +87,8 @@ def update_party_address(game_id: str, ip_address: str, port: int):
         party["status"] = "ready"
         party["lastHeartbeat"] = time.time()
         logger.info(f"[PARTY] {game_id} now ready at {ip_address}:{port}")
+    else:
+        logger.warning(f"[PARTY] Server reported ready for unknown session: {game_id}")
 
 
 def get_party(game_id: str) -> Optional[dict]:

@@ -25,8 +25,13 @@ async def _validate_steam_ticket(ticket_hex: str) -> Optional[str]:
     app_id = os.getenv("STEAM_APP_ID", "999860")
 
     if not api_key or api_key == "YOUR_API_KEY_HERE":
-        logger.warning("[AUTH] No valid Steam API key — skipping ticket validation.")
-        return None
+        # No real API key — derive a deterministic pseudo Steam64 ID from the
+        # ticket so the server can still create player profiles without real
+        # Steam validation. Use STEAM_API_KEY in production for proper auth.
+        import hashlib
+        pseudo_id = "7656" + str(int(hashlib.sha256(ticket_hex.encode()).hexdigest(), 16) % 10**13).zfill(13)
+        logger.warning(f"[AUTH] No Steam API key — using pseudo-ID (dev mode): {pseudo_id}")
+        return pseudo_id
 
     url = "https://api.steampowered.com/ISteamUserAuth/AuthenticateUserTicket/v1/"
     async with httpx.AsyncClient(timeout=8.0) as client:

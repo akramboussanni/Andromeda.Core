@@ -78,8 +78,7 @@ def _resolve_managed_zip_for_ci() -> tuple[str, Optional[BackgroundTask]]:
 async def server_ready(req: ServerReadyRequest):
     """
     Called by a dedicated game server when it has finished starting up
-    and is ready to accept TCP connections from clients.
-    Updates the party's IP:port from pending → ready.
+    and is ready to accept UDP connections from clients.
     """
     logger.info(
         f"[SERVER-READY] session={req.sessionId} port={req.port} region={req.region}"

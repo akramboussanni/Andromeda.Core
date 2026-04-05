@@ -3,8 +3,10 @@ import logging
 import argparse
 import os
 from dotenv import load_dotenv
+from utils.console import enable_ansi_colors
 
 load_dotenv()
+enable_ansi_colors()  # enable VT100 on Windows CMD — controlled by ENABLE_ANSI_COLORS in .env
 
 from fastapi import FastAPI
 from routes import shared, client, server, logs

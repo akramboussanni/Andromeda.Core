@@ -1,19 +1,19 @@
 [
   {
-    "guid": "teleport_deploy_1",
-    "name": "Teleport Deploy 1",
+    "guid": "teleport_1",
+    "name": "Teleport 1",
     "purchasable": true,
     "cost": 0
   },
   {
-    "guid": "teleport_deploy_2",
-    "name": "Teleport Deploy 2",
+    "guid": "teleport_2",
+    "name": "Teleport 2",
     "purchasable": true,
     "cost": 0
   },
   {
-    "guid": "teleport_deploy_3",
-    "name": "Teleport Deploy 3",
+    "guid": "teleport_3",
+    "name": "Teleport 3",
     "purchasable": true,
     "cost": 0
   },

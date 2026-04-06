@@ -30,6 +30,7 @@ class ItemData(BaseModel):
     guid: str
     cost: float = 0.0
     purchasable: bool = True
+    is_starter: bool = True
 
 class PerkData(BaseModel):
     guid: str
@@ -40,6 +41,7 @@ class SkinData(BaseModel):
     guid: str
     cost: float = 0.0
     purchasable: bool = True
+    is_starter: bool = True
 
 class PlayerCharacterLevelData(BaseModel):
     offeredAbilities: List[str] = []
@@ -165,7 +167,7 @@ class LevelsGetRequest(Request):
 class GamesCustomNewRequest(Request):
     version: Optional[str] = None
     region: str
-    maxPlayers: int = 12
+    maxPlayers: int = 8
     gamemodeName: str
     gamemodeData: Optional[object] = None
 
@@ -354,6 +356,7 @@ class PartyCreateRequest(Request):
     partyName: str
     partyToken: Optional[str] = None
     isPublic: bool
+    maxPlayers: int = 8
 
 class PartyCreateResponse(Response):
     data: Optional[JoinData] = None

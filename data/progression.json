@@ -170,11 +170,11 @@
     },
     "scientist": {
       "ability": {
-        "base_guid": "teleport_deploy_1",
+        "base_guid": "teleport_1",
         "tiers": [
-          "teleport_deploy_1",
-          "teleport_deploy_2",
-          "teleport_deploy_3"
+          "teleport_1",
+          "teleport_2",
+          "teleport_3"
         ]
       },
       "perks": [
@@ -248,34 +248,6 @@
             "backstab_1",
             "backstab_2",
             "backstab_3"
-          ]
-        }
-      ]
-    },
-    "cryonaut": {
-      "ability": {
-        "base_guid": "cryobarrier_1",
-        "tiers": [
-          "cryobarrier_1",
-          "cryobarrier_2",
-          "cryobarrier_3"
-        ]
-      },
-      "perks": [
-        {
-          "base_guid": "subzero_1",
-          "tiers": [
-            "subzero_1",
-            "subzero_2",
-            "subzero_3"
-          ]
-        },
-        {
-          "base_guid": "arctic_expanse_1",
-          "tiers": [
-            "arctic_expanse_1",
-            "arctic_expanse_2",
-            "arctic_expanse_3"
           ]
         }
       ]

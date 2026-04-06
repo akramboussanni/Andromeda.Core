@@ -209,7 +209,7 @@ async def party_create(
         authorization=authorization,
         game_mode="CustomParty",
         is_public=request.isPublic,
-        max_players=8,
+        max_players=request.maxPlayers,
     )
 
     recent_game_id = _find_recent_spawn(spawn_key)
@@ -258,6 +258,7 @@ async def party_create(
                 party_name=request.partyName,
                 is_public=request.isPublic,
                 host_steam_id=steam_id,
+                max_players=request.maxPlayers,
                 port=0,
                 game_id=game_id,
             )
@@ -281,6 +282,7 @@ async def party_create(
             party_name=request.partyName,
             is_public=request.isPublic,
             host_steam_id=steam_id,
+            max_players=request.maxPlayers,
             port=port if port > 0 else 0,
             voice_port=(port + 1) if port > 0 else 0,
             game_id=game_id,

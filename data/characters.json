@@ -61,12 +61,6 @@
     "skins": ["assassin"],
     "purchasable": true,
     "cost": 0
-  },
-  {
-    "guid": "cryonaut",
-    "name": "Cryonaut (character settings)",
-    "skins": ["wraith_spy"],
-    "purchasable": true,
-    "cost": 0
   }
+
 ]

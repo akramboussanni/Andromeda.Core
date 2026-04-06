@@ -81,13 +81,15 @@
     "guid": "SniperRifle_charged",
     "name": "Sniper Rifle (item settings) (charged)",
     "purchasable": true,
-    "cost": 0
+    "cost": 0,
+    "is_starter": false
   },
   {
     "guid": "SniperRifle_uncharged",
     "name": "Sniper Rifle (item settings) (uncharged)",
     "purchasable": true,
-    "cost": 0
+    "cost": 0,
+    "is_starter": false
   },
   {
     "guid": "StunGun_charged",
@@ -273,25 +275,29 @@
     "guid": "bulletproof_vest",
     "name": "Bulletproof vest 1 (item settings)",
     "purchasable": true,
-    "cost": 0
+    "cost": 0,
+    "is_starter": false
   },
   {
     "guid": "shield_battery",
     "name": "Shield Battery (item settings)",
     "purchasable": true,
-    "cost": 0
+    "cost": 0,
+    "is_starter": false
   },
   {
     "guid": "bulletproof_vest",
     "name": "Bulletproof vest 2 (item settings)",
     "purchasable": true,
-    "cost": 0
+    "cost": 0,
+    "is_starter": false
   },
   {
     "guid": "bulletproof_vest",
     "name": "Bulletproof vest 3 (item settings)",
     "purchasable": true,
-    "cost": 0
+    "cost": 0,
+    "is_starter": false
   },
   {
     "guid": "Concealed_blade",

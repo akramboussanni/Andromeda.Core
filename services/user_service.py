@@ -180,10 +180,23 @@ def _normalize_player_progression(player: PlayerData) -> bool:
     return changed
 
 
+def _normalize_player_items(player: PlayerData) -> bool:
+    starter_items = {i.guid for i in Catalog.get_items() if i.is_starter}
+    starter_skins = {s.guid for s in Catalog.get_skins() if s.is_starter}
+    allowed = starter_items | starter_skins
+    
+    new_items = [guid for guid in player.items if guid in allowed]
+    if len(new_items) != len(player.items):
+        player.items = new_items
+        return True
+    return False
+
+
 def _normalize_player(player: PlayerData) -> bool:
     skin_changed = _normalize_player_default_skins(player)
+    items_changed = _normalize_player_items(player)
     progression_changed = _normalize_player_progression(player)
-    return skin_changed or progression_changed
+    return skin_changed or items_changed or progression_changed
 
 
 def _build_default_player(steam_id: str) -> PlayerData:
@@ -196,7 +209,7 @@ def _build_default_player(steam_id: str) -> PlayerData:
     for char_def in Catalog.get_characters():
         characters.append(_build_character_progress(char_def.guid, list(char_def.skins)))
 
-    items = [i.guid for i in Catalog.get_items()] + [s.guid for s in Catalog.get_skins()]
+    items = [i.guid for i in Catalog.get_items() if i.is_starter] + [s.guid for s in Catalog.get_skins() if s.is_starter]
 
     return PlayerData(
         steamId=steam_id,

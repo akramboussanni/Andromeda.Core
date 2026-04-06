@@ -868,3 +868,20 @@ async def onboarding_complete():
 @router.post("/bundles/promos/unlock", response_model=Response)
 async def bundles_promos_unlock():
     return Response()
+
+
+# ===========================================================================
+# ADMIN COMMAND POLLING
+# ===========================================================================
+
+@router.get("/client/commands")
+async def client_commands():
+    """
+    Polled by the mod every ~5 seconds.
+    Returns versioned admin commands so clients can react to new ones.
+    """
+    from admin_state import PENDING_COMMANDS
+    return {
+        "broadcast": PENDING_COMMANDS["broadcast"],
+        "force_exit": PENDING_COMMANDS["force_exit"],
+    }

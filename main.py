@@ -1,3 +1,4 @@
+import asyncio
 import uvicorn
 import logging
 import argparse
@@ -9,7 +10,7 @@ load_dotenv()
 enable_ansi_colors()  # enable VT100 on Windows CMD — controlled by ENABLE_ANSI_COLORS in .env
 
 from fastapi import FastAPI
-from routes import shared, client, server, logs
+from routes import shared, client, server, admin
 from utils.logging_middleware import log_requests_middleware
 from utils.upnp import open_port
 from catalog import Catalog
@@ -35,10 +36,18 @@ async def lifespan(app: FastAPI):
     perk_count = len(Catalog.get_perks())
     logger.info(f"[INIT] Catalog loaded — {char_count} characters, {perk_count} perks.")
 
-    # 3. Start log server (unchanged)
+    # 3. Warn if admin panel has no password set
+    if not os.getenv("ADMIN_PASSWORD") and not os.getenv("ADMIN_TOKEN"):
+        logger.warning("[INIT] ADMIN_PASSWORD is not set — admin panel is open to anyone!")
+    else:
+        logger.info("[INIT] Admin panel auth enabled.")
+
+    # 4. Start TCP log server and wire it into the async event loop
     try:
-        from log_server import start_log_server
+        from log_server import start_log_server, init_queue
         start_log_server()
+        init_queue(asyncio.get_event_loop())
+        logger.info("[INIT] Log server started on :9090, draining to SQLite.")
     except Exception as e:
         logger.warning(f"[INIT] Log server not started: {e}")
 
@@ -64,7 +73,7 @@ app.middleware("http")(log_requests_middleware)
 app.include_router(shared.router)
 app.include_router(client.router)
 app.include_router(server.router)
-app.include_router(logs.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

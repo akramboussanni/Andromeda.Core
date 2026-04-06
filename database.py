@@ -73,6 +73,26 @@ async def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_match_steam ON match_history(steam_id);
             CREATE INDEX IF NOT EXISTS idx_char_steam  ON player_characters(steam_id);
+
+            CREATE TABLE IF NOT EXISTS log_entries (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                received_at REAL    NOT NULL,
+                ts          TEXT,
+                level       TEXT    NOT NULL DEFAULT 'info',
+                service     TEXT,
+                steam_id    TEXT,
+                session_id  TEXT,
+                game_name   TEXT,
+                game_mode   TEXT,
+                game_region TEXT,
+                version     TEXT,
+                message     TEXT    NOT NULL DEFAULT '',
+                extra_json  TEXT    NOT NULL DEFAULT '{}'
+            );
+            CREATE INDEX IF NOT EXISTS idx_log_received ON log_entries(received_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_log_steam    ON log_entries(steam_id);
+            CREATE INDEX IF NOT EXISTS idx_log_level    ON log_entries(level);
+            CREATE INDEX IF NOT EXISTS idx_log_session  ON log_entries(session_id);
         """)
         await db.commit()
     logger.info("[DB] Tables initialised.")

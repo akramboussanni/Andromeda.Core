@@ -889,13 +889,14 @@ async def client_events():
 
     async def stream():
         try:
-            # Keep-alive comment every 30s so proxies/load balancers don't drop the connection
             while True:
                 try:
-                    msg = await asyncio.wait_for(q.get(), timeout=30.0)
+                    # Send a ping event every 20s. Using a real event named 'ping' 
+                    # is often more reliable than SSE comments (:) for modern proxies/Cloudflare.
+                    msg = await asyncio.wait_for(q.get(), timeout=20.0)
                     yield msg
                 except asyncio.TimeoutError:
-                    yield ": keep-alive\n\n"
+                    yield "event: ping\ndata: {}\n\n"
         finally:
             sse_commands.unsubscribe(q)
 

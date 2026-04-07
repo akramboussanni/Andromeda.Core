@@ -1,4 +1,5 @@
 import asyncio
+import json
 import re
 import socketserver
 import threading
@@ -25,6 +26,18 @@ _CONTINUATION_RE = re.compile(r'^\s+at\s')
 
 
 def _detect_level(line: str) -> str:
+    # Try parsing as JSON first
+    if line.startswith("{") and line.endswith("}"):
+        try:
+            data = json.loads(line)
+            if "level" in data:
+                lvl = str(data["level"]).lower()
+                if lvl in ["exception", "error"]: return "error"
+                if lvl in ["warning", "warn"]: return "warning"
+                if lvl in ["info", "debug", "trace"]: return "info"
+        except:
+            pass
+
     lower = line.lower()
     for key, level in _TAG_MAP.items():
         if key in lower:
@@ -37,6 +50,13 @@ def _detect_level(line: str) -> str:
 
 
 def _extract_steam_id(line: str):
+    # Try JSON first
+    if line.startswith("{"):
+        try:
+            data = json.loads(line)
+            if data.get("steam_id"): return str(data["steam_id"])
+        except: pass
+
     m = _STEAM_ID_RE.search(line)
     return m.group(1) if m else None
 
@@ -49,6 +69,17 @@ def _is_continuation(line: str) -> bool:
 # Async queue — TCP thread drops entries here, drain task writes to SQLite
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Steam ID to Name cache (ephemeral)
+# ---------------------------------------------------------------------------
+
+_id_to_name: dict[str, str] = {}
+
+
+def get_id_to_name_map():
+    return _id_to_name
+
+
 _queue: asyncio.Queue | None = None
 _loop:  asyncio.AbstractEventLoop | None = None
 
@@ -56,6 +87,13 @@ _loop:  asyncio.AbstractEventLoop | None = None
 def _enqueue(entry: dict):
     if _queue is None or _loop is None:
         return
+    
+    # Trace naming if present in entry
+    sid = entry.get("steam_id")
+    name = entry.get("name") # extracted from JSON if present
+    if sid and name:
+        _id_to_name[sid] = name
+
     try:
         _loop.call_soon_threadsafe(_queue.put_nowait, entry)
     except Exception:
@@ -89,18 +127,44 @@ def init_queue(loop: asyncio.AbstractEventLoop):
 class LogHandler(socketserver.BaseRequestHandler):
     def handle(self):
         buf         = b""
-        pending_ts  = ""
         pending_msg = ""
 
         def flush():
             if not pending_msg:
                 return
-            _enqueue({
+            
+            # Base entry
+            entry = {
                 "level":    _detect_level(pending_msg),
                 "message":  pending_msg,
                 "service":  "tcp",
                 "steam_id": _extract_steam_id(pending_msg),
-            })
+            }
+
+            # If message is JSON, parse and MERGE it so all fields are available
+            if pending_msg.startswith("{") and pending_msg.endswith("}"):
+                try:
+                    data = json.loads(pending_msg)
+                    if isinstance(data, dict):
+                        # Merge game data into entry. 
+                        # We keep 'tcp' as service unless the JSON specifies one.
+                        # We use the JSON level if it exists.
+                        entry.update(data)
+                        
+                        # Normalize level
+                        if "level" in data:
+                            lvl = str(data["level"]).lower()
+                            if "error" in lvl or "exception" in lvl: entry["level"] = "error"
+                            elif "warn" in lvl: entry["level"] = "warning"
+                            else: entry["level"] = "info"
+
+                        # Ensure steam_id is prioritized if it's in the JSON
+                        if data.get("steam_id"):
+                            entry["steam_id"] = str(data["steam_id"])
+                except:
+                    pass
+
+            _enqueue(entry)
 
         try:
             while True:
@@ -117,7 +181,6 @@ class LogHandler(socketserver.BaseRequestHandler):
                         pending_msg += "\n  " + line.strip()
                     else:
                         flush()
-                        pending_ts  = time.strftime("%H:%M:%S")
                         pending_msg = line
             flush()
         except Exception as e:

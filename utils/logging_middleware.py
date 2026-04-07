@@ -51,10 +51,30 @@ async def log_requests_middleware(request: Request, call_next):
         except:
             resp_body_str = "<error-capturing-body>"
     
-    # Format Log
-    log_entry = f"UNKNOWN | {request.method} {request.url.path}\nREQ: {req_body_str}\nRESP ({response.status_code}): {resp_body_str}"
+    # Format Log as JSON
+    log_data = {
+        "level": "info" if response.status_code < 400 else "error",
+        "service": "api",
+        "method": request.method,
+        "path": request.url.path,
+        "status": response.status_code,
+        "environment": "production", # or pull from settings
+        "message": f"API request: {request.method} {request.url.path} -> {response.status_code}",
+        "request_body": req_body_str,
+        "response_body": resp_body_str,
+        "client_ip": request.client.host if request.client else None,
+    }
     
-    # Send to Log Server (Fire and Forget-ish)
-    # ... placeholder ...
+    # Send to Log Server via TCP (Fire and Forget)
+    try:
+        import socket
+        msg = json.dumps(log_data) + "\n"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.1)
+        sock.connect(('127.0.0.1', 9090))
+        sock.sendall(msg.encode('utf-8'))
+        sock.close()
+    except:
+        pass
         
     return response

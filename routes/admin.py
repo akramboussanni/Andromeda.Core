@@ -375,6 +375,7 @@ _HTML = r"""<!DOCTYPE html>
         <div class="stat-card"><div class="stat-label">Active Sessions</div><div class="stat-value success" id="stat-sessions">—</div></div>
         <div class="stat-card"><div class="stat-label">Log Entries</div><div class="stat-value" id="stat-logs">—</div></div>
         <div class="stat-card"><div class="stat-label">Errors Logged</div><div class="stat-value" style="color:var(--danger)" id="stat-errors">—</div></div>
+        <div class="stat-card"><div class="stat-label">Active Clients (SSE)</div><div class="stat-value accent" id="stat-sse">—</div></div>
         <div class="stat-card"><div class="stat-label">Total Games Played</div><div class="stat-value warning" id="stat-games">—</div></div>
       </div>
       <div class="card">
@@ -408,6 +409,14 @@ _HTML = r"""<!DOCTYPE html>
             <div class="filter-group">
               <label class="filter-label">Session ID</label>
               <input type="text" id="f-session" class="filter-input" placeholder="e.g. QVDSZ" onkeydown="if(event.key==='Enter')queryLogs(true)">
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">From (Time)</label>
+              <input type="datetime-local" id="f-start" class="filter-input" onchange="queryLogs(true)">
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">To (Time)</label>
+              <input type="datetime-local" id="f-end" class="filter-input" onchange="queryLogs(true)">
             </div>
             <div class="filter-group" style="flex:1;min-width:180px;">
               <label class="filter-label">Search</label>
@@ -571,7 +580,15 @@ _HTML = r"""<!DOCTYPE html>
     currentPage = page;
     if (page === 'players') loadPlayers();
     if (page === 'sessions') loadSessions();
-    if (page === 'logs') { queryLogs(true); loadLogPlayers(); }
+    if (page === 'logs') { queryLogs(true); loadLogPlayers(); loadPlayersMap(); }
+  }
+
+  // Identity Map (SteamID -> Name)
+  let _playersMap = {};
+  async function loadPlayersMap() {
+    try {
+      _playersMap = await apiFetch('/admin/api/players/map');
+    } catch(e) {}
   }
 
   // Stats
@@ -583,6 +600,7 @@ _HTML = r"""<!DOCTYPE html>
       document.getElementById('stat-sessions').textContent = d.active_sessions;
       document.getElementById('stat-logs').textContent     = (d.total_log_entries || 0).toLocaleString();
       document.getElementById('stat-errors').textContent   = (d.error_count || 0).toLocaleString();
+      document.getElementById('stat-sse').textContent      = d.sse_clients || 0;
       document.getElementById('stat-games').textContent    = d.total_games_played;
       document.getElementById('topbar-meta').textContent   = new Date().toLocaleTimeString();
       // Badge for new log entries on logs tab
@@ -622,10 +640,17 @@ _HTML = r"""<!DOCTYPE html>
     const steam   = document.getElementById('f-steam').value;
     const session = document.getElementById('f-session').value.trim();
     const search  = document.getElementById('f-search').value.trim();
+    const start   = document.getElementById('f-start').value;
+    const end     = document.getElementById('f-end').value;
+
     if (level)   params.set('level',      level);
     if (steam)   params.set('steam_id',   steam);
     if (session) params.set('session_id', session);
     if (search)  params.set('search',     search);
+    
+    if (start) params.set('start_time', (new Date(start).getTime() / 1000).toString());
+    if (end)   params.set('end_time',   (new Date(end).getTime() / 1000).toString());
+    
     if (_oldestId && !reset) params.set('after_id', _oldestId);
     params.set('limit', '100');
 
@@ -675,8 +700,14 @@ _HTML = r"""<!DOCTYPE html>
     tbody.innerHTML = _logRows.map((r, i) => {
       const lvlCls = _LEVEL_CSS[r.level] || 'badge-info';
       const ts = r.ts ? new Date(r.ts).toLocaleString() : new Date(r.received_at * 1000).toLocaleString();
-      const sid = r.steam_id ? `<span class="mono" style="font-size:11px">${esc(r.steam_id)}</span>` : '<span style="color:var(--text-muted)">—</span>';
-      const msgPreview = esc((r.message || '').substring(0, 120));
+      
+      const name = _playersMap[r.steam_id];
+      const steamText = name && name !== r.steam_id ? `${esc(name)} <span style="font-size:10px;opacity:.6">(${esc(r.steam_id.slice(-6))})</span>` : esc(r.steam_id || '—');
+      const sid = r.steam_id ? `<span class="mono" style="font-size:11px">${steamText}</span>` : '<span style="color:var(--text-muted)">—</span>';
+      
+      let msgPreview = r.unity_message || r.message || '';
+      msgPreview = esc(msgPreview.substring(0, 120));
+
       return `<tr style="cursor:pointer" onclick="showDetail(${i})">
         <td class="mono" style="font-size:11px;white-space:nowrap">${esc(ts)}</td>
         <td><span class="badge ${lvlCls}">${esc(r.level)}</span></td>
@@ -698,32 +729,41 @@ _HTML = r"""<!DOCTYPE html>
 
     // Build detail view
     const ts = r.ts ? new Date(r.ts).toLocaleString() : new Date(r.received_at * 1000).toLocaleString();
-    const extra = r.extra || {};
-    const stack = extra.stack || '';
-    const unityMsg = extra.unity_message || '';
-    const dissonanceMsg = extra.dissonance_message || '';
-    const networkUrl = extra.url || '';
-    const networkErr = extra.error || '';
-    const reqBody = extra.requestBody || '';
-
+    
+    let message = r.message || '';
+    let unityMsg = r.unity_message || '';
+    let stack = r.stack || '';
+    let extra = r.extra || {};
+    
     let html = `<div style="display:grid;grid-template-columns:130px 1fr;gap:6px 16px;margin-bottom:16px;">
       <span style="color:var(--text-muted)">Time</span><span>${esc(ts)}</span>
       <span style="color:var(--text-muted)">Level</span><span><span class="badge ${_LEVEL_CSS[r.level]||'badge-info'}">${esc(r.level)}</span></span>
-      <span style="color:var(--text-muted)">Steam ID</span><span>${esc(r.steam_id || '—')}</span>
-      <span style="color:var(--text-muted)">Session</span><span>${esc(r.session_id || '—')}</span>
+      <span style="color:var(--text-muted)">Steam ID</span><span class="mono">${esc(r.steam_id || extra.steam_id || '—')}</span>
+      <span style="color:var(--text-muted)">Session</span><span class="mono">${esc(r.session_id || extra.session_id || '—')}</span>
       <span style="color:var(--text-muted)">Service</span><span>${esc(r.service || '—')}</span>
-      <span style="color:var(--text-muted)">Game</span><span>${esc(r.game_name || '—')} ${r.game_mode ? '· '+esc(r.game_mode) : ''} ${r.game_region ? '· '+esc(r.game_region) : ''}</span>
-      <span style="color:var(--text-muted)">Version</span><span class="mono" style="font-size:11px">${esc(r.version || '—')}</span>
-      <span style="color:var(--text-muted)">Message</span><span style="color:var(--text)">${esc(r.message)}</span>
+      <span style="color:var(--text-muted)">Game</span><span>${esc(r.game_name || extra.game_name || '—')} ${extra.game_mode ? '· '+esc(extra.game_mode) : ''}</span>
+      <span style="color:var(--text-muted)">Version</span><span class="mono" style="font-size:11px">${esc(r.version || extra.version || '—')}</span>
+      <span style="color:var(--text-muted)">Message</span><span style="color:var(--text);font-weight:600;">${esc(message)}</span>
     </div>`;
 
-    if (unityMsg) html += `<div style="margin-bottom:12px;"><div style="color:var(--text-muted);margin-bottom:4px;">Unity Error</div><div style="color:#fca5a5;background:#1a0808;padding:10px;border-radius:6px;">${esc(unityMsg)}</div></div>`;
-    if (networkUrl) html += `<div style="margin-bottom:12px;"><div style="color:var(--text-muted);margin-bottom:4px;">Network Request</div><div style="background:var(--surface2);padding:10px;border-radius:6px;"><div style="color:#60a5fa;">${esc(networkUrl)}</div>${networkErr ? `<div style="color:#fca5a5;margin-top:4px;">Error: ${esc(networkErr)}</div>` : ''}</div></div>`;
-    if (reqBody) html += `<div style="margin-bottom:12px;"><div style="color:var(--text-muted);margin-bottom:4px;">Request Body</div><pre style="background:var(--surface2);padding:10px;border-radius:6px;overflow-x:auto;margin:0;font-size:11px;">${esc(reqBody)}</pre></div>`;
-    if (dissonanceMsg) html += `<div style="margin-bottom:12px;"><div style="color:var(--text-muted);margin-bottom:4px;">Dissonance</div><div style="background:var(--surface2);padding:10px;border-radius:6px;color:#a78bfa;">${esc(dissonanceMsg)}</div></div>`;
+    if (unityMsg && unityMsg !== message) {
+        html += `<div style="margin-bottom:12px;"><div style="color:var(--text-muted);margin-bottom:4px;">Unity Message</div><div style="color:#fca5a5;background:#1a0808;padding:10px;border-radius:6px;">${esc(unityMsg)}</div></div>`;
+    }
+    
+    if (extra.url) {
+        html += `<div style="margin-bottom:12px;"><div style="color:var(--text-muted);margin-bottom:4px;">Network Request</div><div style="background:var(--surface2);padding:10px;border-radius:6px;"><div style="color:#60a5fa;">${esc(extra.url)}</div>${extra.error ? `<div style="color:#fca5a5;margin-top:4px;">Error: ${esc(extra.error)}</div>` : ''}</div></div>`;
+    }
+
     if (stack) {
       html += `<div><div style="color:var(--text-muted);margin-bottom:4px;">Stack Trace</div>
-        <pre style="background:#0a0c12;padding:12px;border-radius:6px;overflow-x:auto;margin:0;font-size:11px;line-height:1.7;color:#94a3b8;max-height:350px;overflow-y:auto;">${esc(stack.replace(/\\r\\n/g,'\n'))}</pre></div>`;
+        <pre style="background:#0a0c12;padding:12px;border-radius:6px;overflow-x:auto;margin:0;font-size:11px;line-height:1.7;color:#94a3b8;max-height:400px;overflow-y:auto;border:1px solid #ffffff11;">${esc(stack.replace(/\\r\\n/g,'\n'))}</pre></div>`;
+    }
+
+    // Show remaining extra data
+    const knownKeys = ['level', 'service', 'steam_id', 'session_id', 'game_name', 'game_mode', 'game_region', 'version', 'timestamp', 'message', 'unity_message', 'stack', 'stackTrace', 'url', 'error', 'environment'];
+    const otherKeys = Object.keys(extra).filter(k => !knownKeys.includes(k));
+    if (otherKeys.length > 0) {
+        html += `<div style="margin-top:16px;"><div style="color:var(--text-muted);margin-bottom:4px;">Additional Data</div><pre style="background:var(--surface);padding:10px;border-radius:6px;font-size:11px;color:#cbd5e1;border:1px solid var(--border);">${esc(JSON.stringify(Object.fromEntries(otherKeys.map(k => [k, extra[k]])), null, 2))}</pre></div>`;
     }
 
     content.innerHTML = html;
@@ -948,6 +988,7 @@ async def admin_stats(admin_session: Optional[str] = Cookie(None)):
         "total_log_entries": total_logs,
         "error_count":       error_count,
         "total_games_played": int(total_games),
+        "sse_clients":       sse_commands.connected_count(),
     }
 
 
@@ -958,6 +999,8 @@ async def admin_logs(
     steam_id:   Optional[str] = None,
     session_id: Optional[str] = None,
     search:     Optional[str] = None,
+    start_time: Optional[float] = None,
+    end_time:   Optional[float] = None,
     after_id:   Optional[int] = None,
     limit: int = 100,
 ):
@@ -968,10 +1011,39 @@ async def admin_logs(
         steam_id=steam_id or None,
         session_id=session_id or None,
         search=search or None,
+        start_time=start_time,
+        end_time=end_time,
         after_id=after_id,
         limit=min(limit, 200),
     )
     return {"rows": rows, "total": total, "returned": len(rows)}
+
+
+@router.get("/admin/api/players/map")
+async def admin_players_map(admin_session: Optional[str] = Cookie(None)):
+    """Returns {steam_id: username} mapping for all registered players."""
+    if not _authed(admin_session):
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    
+    # Start with the memory cache from logs
+    import log_server
+    mapping = dict(log_server.get_id_to_name_map())
+    
+    # Add/Override from DB
+    async with db.get_db() as conn:
+        # We don't have a 'name' column in players yet, but we can check if they
+        # appear in match history with a name.
+        async with conn.execute("SELECT steam_id FROM players") as cur:
+            rows = await cur.fetchall()
+            for r in rows:
+                sid = r["steam_id"]
+                if sid not in mapping:
+                    mapping[sid] = sid # Fallback
+                    
+    return mapping
+
+
+# ... (rest of routes)
 
 
 @router.get("/admin/api/logs/players")

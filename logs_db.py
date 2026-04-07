@@ -10,8 +10,11 @@ from typing import Optional
 from database import get_db
 
 # Fields we pull out of the JSON into their own columns for indexing/filtering.
-_INDEXED_FIELDS = {"level", "service", "steam_id", "session_id",
-                   "game_name", "game_mode", "game_region", "version", "timestamp"}
+_INDEXED_FIELDS = {
+    "level", "service", "steam_id", "session_id", "game_name", "game_mode", 
+    "game_region", "version", "timestamp", "unity_message", "stack", "message",
+    "name", "username" # these go to extra_json but we skip them to avoid double-storage
+}
 
 
 async def ingest(entry: dict) -> int:
@@ -20,7 +23,7 @@ async def ingest(entry: dict) -> int:
     Returns the new row id.
     """
     level   = str(entry.get("level") or "info").lower()
-    ts      = entry.get("timestamp")
+    ts      = entry.get("timestamp") or entry.get("ts")
     service = entry.get("service")
     steam_id   = entry.get("steam_id")
     session_id = entry.get("session_id")
@@ -28,20 +31,26 @@ async def ingest(entry: dict) -> int:
     game_mode  = entry.get("game_mode")
     game_region = entry.get("game_region")
     version     = entry.get("version")
-    message     = str(entry.get("message") or "")
+    
+    # Message vs UnityMessage: message is usually just 'unity internal log', 
+    # while 'unity_message' is the real error.
+    message       = str(entry.get("message") or "")
+    unity_message = entry.get("unity_message")
+    stack         = entry.get("stack") or entry.get("stackTrace")
 
-    # Stash everything else in extra_json so nothing is lost
-    extra = {k: v for k, v in entry.items() if k not in _INDEXED_FIELDS and k != "message"}
+    # Stash EVERYTHING else in extra_json so nothing is lost. 
+    # We exclude the indexed columns to keep the DB size manageable.
+    extra = {k: v for k, v in entry.items() if k not in _INDEXED_FIELDS}
     extra_json = json.dumps(extra, ensure_ascii=False)
 
     async with get_db() as db:
         cur = await db.execute(
             """INSERT INTO log_entries
                (received_at, ts, level, service, steam_id, session_id,
-                game_name, game_mode, game_region, version, message, extra_json)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                game_name, game_mode, game_region, version, message, unity_message, stack, extra_json)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (time.time(), ts, level, service, steam_id, session_id,
-             game_name, game_mode, game_region, version, message, extra_json),
+             game_name, game_mode, game_region, version, message, unity_message, stack, extra_json),
         )
         await db.commit()
         return cur.lastrowid
@@ -53,8 +62,10 @@ async def query(
     steam_id:   Optional[str] = None,
     session_id: Optional[str] = None,
     search:     Optional[str] = None,
-    after_id:   Optional[int] = None,   # for "load older" pagination
-    before_id:  Optional[int] = None,   # for "load newer" pagination
+    start_time: Optional[float] = None, # received_at >= start_time
+    end_time:   Optional[float] = None, # received_at <= end_time
+    after_id:   Optional[int] = None,   # for pagination (older)
+    before_id:  Optional[int] = None,   # for pagination (newer)
     limit: int = 100,
 ) -> tuple[list[dict], int]:
     """
@@ -74,8 +85,14 @@ async def query(
         clauses.append("session_id = ?")
         params.append(session_id)
     if search:
-        clauses.append("(message LIKE ? OR extra_json LIKE ?)")
-        params += [f"%{search}%", f"%{search}%"]
+        clauses.append("(message LIKE ? OR unity_message LIKE ? OR extra_json LIKE ?)")
+        params += [f"%{search}%", f"%{search}%", f"%{search}%"]
+    if start_time:
+        clauses.append("received_at >= ?")
+        params.append(start_time)
+    if end_time:
+        clauses.append("received_at <= ?")
+        params.append(end_time)
     if after_id:
         clauses.append("id < ?")
         params.append(after_id)
@@ -93,7 +110,7 @@ async def query(
 
         async with db.execute(
             f"""SELECT id, received_at, ts, level, service, steam_id, session_id,
-                       game_name, game_mode, game_region, version, message, extra_json
+                       game_name, game_mode, game_region, version, message, unity_message, stack, extra_json
                 FROM log_entries {where}
                 ORDER BY id DESC LIMIT ?""",
             params + [limit],

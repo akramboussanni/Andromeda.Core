@@ -87,6 +87,8 @@ async def init_db():
                 game_region TEXT,
                 version     TEXT,
                 message     TEXT    NOT NULL DEFAULT '',
+                unity_message TEXT,
+                stack       TEXT,
                 extra_json  TEXT    NOT NULL DEFAULT '{}'
             );
             CREATE INDEX IF NOT EXISTS idx_log_received ON log_entries(received_at DESC);

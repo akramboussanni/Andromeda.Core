@@ -7,52 +7,54 @@ from starlette.concurrency import iterate_in_threadpool
 logger = logging.getLogger("Andromeda.Core")
 
 async def log_requests_middleware(request: Request, call_next):
-    # Skip logging for log polling endpoints to avoid spam
-    if request.url.path.startswith("/logs"):
+    # Skip logging for log polling and SSE endpoints to avoid spam/crashes
+    if request.url.path.startswith("/logs") or request.url.path == "/client/events":
         return await call_next(request)
 
-    # Capture Request Body
-    req_body_bytes = await request.body()
-    # Restore body for downstream
-    async def receive():
-        return {"type": "http.request", "body": req_body_bytes}
-    request._receive = receive
-    
-    req_is_json = "application/json" in request.headers.get("content-type", "")
-    req_body_str = req_body_bytes.decode("utf-8", errors="replace") if req_body_bytes else ""
-    if req_is_json: 
-        # Clean up whitespace for nicer logs if strictly JSON
+    # Capture Request Body (only for non-GET)
+    req_body_str = ""
+    if request.method != "GET":
         try:
-            req_body_str = json.dumps(json.loads(req_body_str))
-        except: 
+            req_body_bytes = await request.body()
+            # Restore body for downstream
+            async def receive():
+                return {"type": "http.request", "body": req_body_bytes}
+            request._receive = receive
+            
+            req_is_json = "application/json" in request.headers.get("content-type", "")
+            req_body_str = req_body_bytes.decode("utf-8", errors="replace") if req_body_bytes else ""
+            if req_is_json and req_body_str: 
+                try:
+                    req_body_str = json.dumps(json.loads(req_body_str))
+                except: 
+                    pass
+        except:
             pass
 
     response = await call_next(request)
     
-    # Capture Response Body
-    # We need to re-construct the response chunks to read them without consuming them forever
-    resp_body_bytes = b""
-    async for chunk in response.body_iterator:
-        resp_body_bytes += chunk
+    # DO NOT capture body for StreamingResponse or SSE
+    # Starlette's BaseHTTPMiddleware + StreamingResponse = Disaster if you touch the body_iterator
+    is_streaming = "text/event-stream" in response.headers.get("content-type", "")
     
-    # Re-create the iterator for the actual response
-    response.body_iterator = iterate_in_threadpool(iter([resp_body_bytes]))
-    
-    resp_body_str = resp_body_bytes.decode("utf-8", errors="replace")
+    resp_body_str = "<streaming>"
+    if not is_streaming:
+        try:
+            # Capture Response Body
+            resp_body_bytes = b""
+            async for chunk in response.body_iterator:
+                resp_body_bytes += chunk
+            
+            # Re-create the iterator for the actual response
+            response.body_iterator = iterate_in_threadpool(iter([resp_body_bytes]))
+            resp_body_str = resp_body_bytes.decode("utf-8", errors="replace")
+        except:
+            resp_body_str = "<error-capturing-body>"
     
     # Format Log
     log_entry = f"UNKNOWN | {request.method} {request.url.path}\nREQ: {req_body_str}\nRESP ({response.status_code}): {resp_body_str}"
     
     # Send to Log Server (Fire and Forget-ish)
-    try:
-        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # sock.settimeout(0.1)
-        # sock.connect(('127.0.0.1', 9090))
-        # sock.sendall(log_entry.encode('utf-8'))
-        # sock.close()
-        pass
-    except Exception as e:
-        # Don't break the server if logging fails
-        print(f"Failed to send log to log server: {e}")
+    # ... placeholder ...
         
     return response

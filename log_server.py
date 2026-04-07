@@ -50,15 +50,14 @@ def _is_continuation(line: str) -> bool:
 # ---------------------------------------------------------------------------
 
 _queue: asyncio.Queue | None = None
+_loop:  asyncio.AbstractEventLoop | None = None
 
 
 def _enqueue(entry: dict):
-    if _queue is None:
+    if _queue is None or _loop is None:
         return
     try:
-        _queue.get_nowait   # sanity check it's the right object
-        loop = asyncio.get_event_loop()
-        loop.call_soon_threadsafe(_queue.put_nowait, entry)
+        _loop.call_soon_threadsafe(_queue.put_nowait, entry)
     except Exception:
         pass
 
@@ -77,8 +76,9 @@ async def _drain():
 
 
 def init_queue(loop: asyncio.AbstractEventLoop):
-    global _queue
+    global _queue, _loop
     _queue = asyncio.Queue()
+    _loop  = loop
     loop.create_task(_drain())
 
 
@@ -132,7 +132,8 @@ class LogHandler(socketserver.BaseRequestHandler):
 class _ServerThread(threading.Thread):
     def __init__(self):
         super().__init__(daemon=True)
-        self.server = socketserver.TCPServer(("0.0.0.0", 9090), LogHandler)
+        # Using ThreadingTCPServer to allow multiple game instances to log concurrently
+        self.server = socketserver.ThreadingTCPServer(("0.0.0.0", 9090), LogHandler)
 
     def run(self):
         print("[LogServer] Listening on :9090")

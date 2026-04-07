@@ -871,17 +871,39 @@ async def bundles_promos_unlock():
 
 
 # ===========================================================================
-# ADMIN COMMAND POLLING
+# ADMIN COMMAND STREAM (SSE)
 # ===========================================================================
 
-@router.get("/client/commands")
-async def client_commands():
+@router.get("/client/events")
+async def client_events():
     """
-    Polled by the mod every ~5 seconds.
-    Returns versioned admin commands so clients can react to new ones.
+    Server-Sent Events stream. Mod connects once and receives admin commands
+    (broadcast, force_exit) instantly as they are issued. No polling, no TTL.
+    New joiners connect fresh and only receive commands issued after connection.
     """
-    from admin_state import PENDING_COMMANDS
-    return {
-        "broadcast": PENDING_COMMANDS["broadcast"],
-        "force_exit": PENDING_COMMANDS["force_exit"],
-    }
+    import asyncio
+    import sse_commands
+    from fastapi.responses import StreamingResponse
+
+    q = await sse_commands.subscribe()
+
+    async def stream():
+        try:
+            # Keep-alive comment every 30s so proxies/load balancers don't drop the connection
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=30.0)
+                    yield msg
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            sse_commands.unsubscribe(q)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )

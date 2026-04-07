@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 import database as db
 import logs_db
-from admin_state import PENDING_COMMANDS
+import sse_commands
 import services.party_service as ps
 
 router = APIRouter()
@@ -1032,17 +1032,15 @@ class BroadcastRequest(BaseModel):
 async def admin_broadcast(body: BroadcastRequest, admin_session: Optional[str] = Cookie(None)):
     if not _authed(admin_session):
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
-    PENDING_COMMANDS["broadcast"]["version"] += 1
-    PENDING_COMMANDS["broadcast"]["message"] = body.message
+    count = sse_commands.push("broadcast", {"message": body.message})
     await logs_db.ingest({"level": "info", "service": "admin", "message": f"ADMIN BROADCAST: {body.message}"})
-    return {"status": "ok", "version": PENDING_COMMANDS["broadcast"]["version"]}
+    return {"status": "ok", "clients_notified": count}
 
 
 @router.post("/admin/api/force-exit")
 async def admin_force_exit(admin_session: Optional[str] = Cookie(None)):
     if not _authed(admin_session):
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
-    PENDING_COMMANDS["force_exit"]["version"] += 1
-    msg = f"ADMIN FORCE EXIT issued (version {PENDING_COMMANDS['force_exit']['version']})"
-    await logs_db.ingest({"level": "warning", "service": "admin", "message": msg})
-    return {"status": "ok", "version": PENDING_COMMANDS["force_exit"]["version"]}
+    count = sse_commands.push("force_exit", {})
+    await logs_db.ingest({"level": "warning", "service": "admin", "message": "ADMIN FORCE EXIT issued"})
+    return {"status": "ok", "clients_notified": count}

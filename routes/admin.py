@@ -195,20 +195,23 @@ _HTML = r"""<!DOCTYPE html>
 <title>Andromeda Admin</title>
 <style>
   :root {
-    --bg: #0f1117; --surface: #1a1d27; --surface2: #222537; --border: #2a2d3e;
-    --text: #e2e8f0; --text-muted: #64748b; --accent: #6366f1; --accent-hover: #818cf8;
-    --danger: #ef4444; --danger-hover: #f87171; --success: #22c55e;
+    --bg: #0b1320; --surface: #102033; --surface2: #162b43; --border: #27405e;
+    --text: #e7f1ff; --text-muted: #87a0bf; --accent: #00a3a3; --accent-hover: #1ac2c2;
+    --danger: #f05252; --danger-hover: #ff7a7a; --success: #37c27f;
     --warning: #f59e0b; --info: #3b82f6; --radius: 8px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter','Segoe UI',system-ui,sans-serif; background: var(--bg);
+  body { font-family: 'Bahnschrift','Segoe UI Variable','Segoe UI',sans-serif; background:
+         radial-gradient(1200px 700px at 0% 0%, #113254 0%, var(--bg) 55%),
+         radial-gradient(1000px 600px at 100% 10%, #1a2f2a 0%, transparent 60%),
+         var(--bg);
          color: var(--text); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
 
   /* Sidebar */
   .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border);
              display: flex; flex-direction: column; flex-shrink: 0; }
   .sidebar-logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
-  .sidebar-logo h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -.5px; }
+  .sidebar-logo h1 { font-size: 18px; font-weight: 700; color: #66f0e6; letter-spacing: -.5px; }
   .sidebar-logo span { font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px; }
   .nav { flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
@@ -216,7 +219,7 @@ _HTML = r"""<!DOCTYPE html>
               font-weight: 500; transition: all .15s; border: none; background: transparent;
               width: 100%; text-align: left; font-size: 14px; }
   .nav-item:hover { background: var(--surface2); color: var(--text); }
-  .nav-item.active { background: var(--accent); color: white; }
+  .nav-item.active { background: linear-gradient(90deg, #00a3a3, #3ea1ff); color: white; }
   .nav-item .icon { font-size: 16px; width: 18px; text-align: center; }
   .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); }
   .logout-btn { display: flex; align-items: center; gap: 8px; color: var(--text-muted);
@@ -226,7 +229,7 @@ _HTML = r"""<!DOCTYPE html>
 
   /* Main */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .topbar { padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+  .topbar { padding: 14px 24px; background: linear-gradient(180deg, #10263d, var(--surface)); border-bottom: 1px solid var(--border);
             display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .topbar-title { font-size: 16px; font-weight: 600; }
   .topbar-meta { font-size: 12px; color: var(--text-muted); }
@@ -263,7 +266,7 @@ _HTML = r"""<!DOCTYPE html>
        border-bottom: 1px solid var(--border); background: var(--surface2); white-space: nowrap; }
   td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(99,102,241,.04); }
+  tr:hover td { background: rgba(26,194,194,.08); }
   .mono { font-family: 'Consolas',monospace; font-size: 12px; color: var(--text-muted); }
 
   /* Badges */
@@ -314,7 +317,7 @@ _HTML = r"""<!DOCTYPE html>
   .btn { padding: 9px 18px; border-radius: var(--radius); border: none; cursor: pointer;
          font-size: 14px; font-weight: 600; transition: all .15s; display: inline-flex;
          align-items: center; gap: 6px; }
-  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary { background: linear-gradient(90deg, #00a3a3, #3ea1ff); color: white; }
   .btn-primary:hover { background: var(--accent-hover); }
   .btn-danger { background: var(--danger); color: white; }
   .btn-danger:hover { background: var(--danger-hover); }
@@ -357,7 +360,74 @@ _HTML = r"""<!DOCTYPE html>
   /* Log table */
   #log-table td { font-size: 13px; max-width: 400px;
                   overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  #log-table tr:hover td { background: rgba(99,102,241,.06); cursor: pointer; }
+  #log-table tr:hover td { background: rgba(26,194,194,.08); cursor: pointer; }
+
+  /* Rank picker modal */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 8, 18, 0.75);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal-card {
+    width: min(520px, 100%);
+    background: linear-gradient(180deg, #0f2238, #0c1a2a);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title { font-size: 15px; font-weight: 700; }
+  .modal-body { padding: 16px; display: grid; gap: 14px; }
+  .rank-preview {
+    padding: 10px 12px;
+    border: 1px dashed #3d6f95;
+    border-radius: 8px;
+    background: rgba(3, 18, 32, 0.45);
+    color: #bfe2ff;
+    font-weight: 600;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 980px) {
+    body { flex-direction: column; height: auto; min-height: 100vh; overflow: auto; }
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar-logo { padding: 14px 16px; }
+    .nav { flex-direction: row; overflow-x: auto; padding: 8px; }
+    .nav-item { min-width: max-content; }
+    .sidebar-footer { display: none; }
+    .main { min-height: 0; }
+    .topbar { padding: 12px 14px; }
+    .content { padding: 12px; }
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .action-grid { grid-template-columns: 1fr; }
+    .search-input { width: 100% !important; }
+    th, td { padding: 8px 10px; }
+    #toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+  }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .topbar-title { font-size: 15px; }
+    .card-header { flex-direction: column; align-items: flex-start; }
+  }
 </style>
 </head>
 <body>
@@ -510,12 +580,12 @@ _HTML = r"""<!DOCTYPE html>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Registered Players</span>
-          <input type="text" class="search-input" id="player-search" placeholder="Search steam ID..." oninput="filterPlayers()">
+          <input type="text" class="search-input" id="player-search" placeholder="Search username or Steam ID..." oninput="queueFilterPlayers()">
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Steam ID</th><th>Rank</th><th>Credits</th><th>Total Games</th><th>Backer</th><th>Joined</th><th>Last Seen</th></tr></thead>
-            <tbody id="players-tbody"><tr><td colspan="7"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr></tbody>
+            <thead><tr><th>Player</th><th>Steam ID</th><th>Rank</th><th>Credits</th><th>W/L</th><th>Win Rate</th><th>Total Games</th><th>Backer</th><th>Name Color</th><th>Joined</th><th>Last Seen</th></tr></thead>
+            <tbody id="players-tbody"><tr><td colspan="11"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -567,6 +637,37 @@ _HTML = r"""<!DOCTYPE html>
   </div>
 </div>
 
+<div id="rank-modal" class="modal-backdrop" onclick="onRankModalBackdrop(event)">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-title">Set Player Rank</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeRankDialog()">Close</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rank-modal-steam-id" value="">
+      <div>
+        <label class="form-label">Tier</label>
+        <select id="rank-major" onchange="updateRankPreview()"></select>
+      </div>
+      <div>
+        <label class="form-label">Level</label>
+        <select id="rank-sub" onchange="updateRankPreview()">
+          <option value="0">I</option>
+          <option value="1">II</option>
+          <option value="2">III</option>
+          <option value="3">IV</option>
+          <option value="4">V</option>
+        </select>
+      </div>
+      <div class="rank-preview" id="rank-preview">Preview: Uncalibrated (raw 0)</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeRankDialog()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRankDialog()">Save Rank</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -608,7 +709,12 @@ _HTML = r"""<!DOCTYPE html>
     currentPage = page;
     if (page === 'players') loadPlayers();
     if (page === 'sessions') loadSessions();
-    if (page === 'logs') { queryLogs(true); loadLogPlayers(); loadPlayersMap(); }
+    if (page === 'logs') {
+      loadPlayersMap().then(() => {
+        loadLogPlayers();
+        queryLogs(true);
+      });
+    }
   }
 
   // Rank Decoration (matches SidebarPartyPlayer/RankMedalList logic)
@@ -616,12 +722,99 @@ _HTML = r"""<!DOCTYPE html>
   const SUB_RANKS = ["I", "II", "III", "IV", "V"];
 
   function getRankName(rank) {
-    if (rank === 0) return "Uncalibrated";
-    const majorIdx = Math.floor(rank / 5);
-    const subIdx = rank % 5;
+    const raw = Number(rank || 0);
+    if (raw <= 0) return "Uncalibrated";
+    const adjusted = raw - 1;
+    const majorIdx = Math.floor(adjusted / 5);
+    const subIdx = adjusted % 5;
     const tier = TIER_NAMES[majorIdx] || "Elite";
     const sub = SUB_RANKS[subIdx] || "";
     return `${tier} ${sub}`;
+  }
+
+  function rankToMajorSub(rank) {
+    const raw = Number(rank || 0);
+    if (raw <= 0) return { major: 0, sub: 0 };
+    const adjusted = raw - 1;
+    return {
+      major: Math.floor(adjusted / 5),
+      sub: adjusted % 5,
+    };
+  }
+
+  function majorSubToRank(major, sub) {
+    const m = Number(major || 0);
+    const s = Number(sub || 0);
+    return (m * 5) + s + 1;
+  }
+
+  let _rankDialogOpen = false;
+  function onRankModalBackdrop(event) {
+    if (event.target && event.target.id === 'rank-modal') {
+      closeRankDialog();
+    }
+  }
+
+  function openRankDialog(steamId, currentRank) {
+    const modal = document.getElementById('rank-modal');
+    const steamInput = document.getElementById('rank-modal-steam-id');
+    const majorSel = document.getElementById('rank-major');
+    const subSel = document.getElementById('rank-sub');
+
+    steamInput.value = steamId;
+
+    if (majorSel.options.length === 0) {
+      TIER_NAMES.forEach((tierName, idx) => {
+        const option = document.createElement('option');
+        option.value = String(idx);
+        option.textContent = tierName;
+        majorSel.appendChild(option);
+      });
+      const elite = document.createElement('option');
+      elite.value = String(TIER_NAMES.length);
+      elite.textContent = 'Elite';
+      majorSel.appendChild(elite);
+    }
+
+    const parts = rankToMajorSub(currentRank);
+    majorSel.value = String(parts.major);
+    subSel.value = String(parts.sub);
+
+    updateRankPreview();
+    modal.classList.add('show');
+    _rankDialogOpen = true;
+  }
+
+  function closeRankDialog() {
+    const modal = document.getElementById('rank-modal');
+    modal.classList.remove('show');
+    _rankDialogOpen = false;
+  }
+
+  function updateRankPreview() {
+    const major = Number(document.getElementById('rank-major').value || 0);
+    const sub = Number(document.getElementById('rank-sub').value || 0);
+    const raw = majorSubToRank(major, sub);
+    document.getElementById('rank-preview').textContent = `Preview: ${getRankName(raw)} (raw ${raw})`;
+  }
+
+  async function saveRankDialog() {
+    const steamId = document.getElementById('rank-modal-steam-id').value;
+    const major = Number(document.getElementById('rank-major').value || 0);
+    const sub = Number(document.getElementById('rank-sub').value || 0);
+    const rawRank = majorSubToRank(major, sub);
+
+    try {
+      await apiFetch('/admin/api/players/rank', {
+        method: 'POST',
+        body: JSON.stringify({ steamId: steamId, rank: rawRank })
+      });
+      closeRankDialog();
+      toast(`Updated rank for ${steamId} -> ${getRankName(rawRank)}`);
+      loadPlayers();
+    } catch(e) {
+      toast('Failed to update rank', 'error');
+    }
   }
 
   // Identity Map (SteamID -> Name)
@@ -664,7 +857,9 @@ _HTML = r"""<!DOCTYPE html>
       sel.innerHTML = '<option value="">All players</option>';
       ids.forEach(id => {
         const o = document.createElement('option');
-        o.value = id; o.textContent = id;
+        const name = _playersMap[id];
+        o.value = id;
+        o.textContent = name && name !== id ? `${name} (${id.slice(-6)})` : id;
         if (id === cur) o.selected = true;
         sel.appendChild(o);
       });
@@ -912,33 +1107,45 @@ _HTML = r"""<!DOCTYPE html>
 
   // Players
   let allPlayers = [];
+  let _filterPlayersTimer = null;
   async function loadPlayers() {
     const tbody = document.getElementById('players-tbody');
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr>';
     try {
+      await loadPlayersMap();
       allPlayers = await apiFetch('/admin/api/players');
       filterPlayers();
     } catch(e) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">❌</div>Failed to load</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">❌</div>Failed to load</div></td></tr>';
     }
+  }
+
+  function queueFilterPlayers() {
+    if (_filterPlayersTimer) clearTimeout(_filterPlayersTimer);
+    _filterPlayersTimer = setTimeout(filterPlayers, 120);
   }
 
   function filterPlayers() {
     const search = document.getElementById('player-search').value.toLowerCase();
-    const filtered = allPlayers.filter(p => !search || p.steam_id.includes(search));
+    const filtered = allPlayers.filter(p => {
+      if (!search) return true;
+      const steam = String(p.steam_id || '').toLowerCase();
+      const name = String(_playersMap[p.steam_id] || '').toLowerCase();
+      return steam.includes(search) || name.includes(search);
+    });
     const tbody = document.getElementById('players-tbody');
-    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">👤</div>No players found</div></td></tr>'; return; }
+    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">👤</div>No players found</div></td></tr>'; return; }
     tbody.innerHTML = filtered.map(p => `<tr>
+      <td>${esc(_playersMap[p.steam_id] || 'Unknown')}</td>
       <td><span class="mono">${esc(p.steam_id)}</span></td>
       <td>
         <div style="font-weight:600; color:${p.name_color || 'inherit'}">${getRankName(p.rank)}</div>
         <div style="font-size:10px;color:var(--text-muted)">Raw Rank: ${p.rank}</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
-          <input type="number" min="0" value="${Number(p.rank || 0)}" id="rank-${p.steam_id}" style="width:84px;padding:4px 6px;font-size:12px;" />
-          <button onclick="updatePlayerRank('${p.steam_id}')" style="padding:4px 8px;font-size:11px;">Save</button>
-        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="openRankDialog('${p.steam_id}', ${Number(p.rank || 0)})">Edit Tier/Level</button>
       </td>
       <td>${Math.round(p.credits).toLocaleString()}</td>
+      <td>${Number(p.wins || 0)} / ${Number(p.losses || 0)}</td>
+      <td>${(Number(p.wins || 0) + Number(p.losses || 0)) > 0 ? ((100 * Number(p.wins || 0) / (Number(p.wins || 0) + Number(p.losses || 0))).toFixed(1) + '%' ) : '0.0%'}</td>
       <td>${p.total_games}</td>
       <td>${p.kickstarter_backer ? '<span class="badge badge-success">YES</span>' : '<span class="badge badge-info">NO</span>'}</td>
       <td>
@@ -964,36 +1171,19 @@ _HTML = r"""<!DOCTYPE html>
     } catch(e) { toast('Failed to update name color', 'error'); }
   }
 
-  async function updatePlayerRank(steamId) {
-    const input = document.getElementById(`rank-${steamId}`);
-    if (!input) return;
-
-    const parsed = Number.parseInt(input.value, 10);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      toast('Rank must be a non-negative integer', 'error');
-      return;
-    }
-
-    try {
-      await apiFetch('/admin/api/players/rank', {
-        method: 'POST',
-        body: JSON.stringify({ steamId, rank: parsed })
-      });
-      toast(`Updated rank for ${steamId} -> ${parsed}`);
-      loadPlayers();
-    } catch(e) {
-      toast('Failed to update rank', 'error');
-    }
-  }
-
   // Sessions
   async function loadSessions() {
     const tbody = document.getElementById('sessions-tbody');
     tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr>';
     try {
+      await loadPlayersMap();
       const sessions = await apiFetch('/admin/api/sessions');
       if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🎮</div>No active sessions</div></td></tr>'; return; }
       tbody.innerHTML = sessions.map(s => {
+        const hostName = _playersMap[s.host_steam_id] && _playersMap[s.host_steam_id] !== s.host_steam_id
+          ? `${esc(_playersMap[s.host_steam_id])} (${esc(s.host_steam_id.slice(-6))})`
+          : esc(s.host_steam_id);
+
         let playersHtml = '';
         if (s.players && s.players.length) {
           playersHtml = `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);background:#00000033;padding:6px 10px;border-radius:4px;border:1px solid #ffffff11;">
@@ -1022,7 +1212,7 @@ _HTML = r"""<!DOCTYPE html>
             ${playersHtml}
           </td>
           <td>${s.is_public ? '✅' : '🔒'}</td>
-          <td><span class="mono">${esc(s.host_steam_id)}</span></td>
+          <td><span class="mono">${hostName}</span></td>
           <td><span class="mono">${esc(s.ip_address)}:${s.port}</span></td>
         </tr>`;
       }).join('');
@@ -1216,6 +1406,16 @@ async def admin_players_map(admin_session: Optional[str] = Cookie(None)):
     
     # Add/Override from DB
     async with db.get_db() as conn:
+      async with conn.execute(
+        "SELECT steam_id, discord_username FROM discord_links WHERE status = 'confirmed'"
+      ) as cur:
+        rows = await cur.fetchall()
+        for r in rows:
+          sid = r["steam_id"]
+          username = (r["discord_username"] or "").strip()
+          if sid and username:
+            mapping[sid] = username
+
         # We don't have a 'name' column in players yet, but we can check if they
         # appear in match history with a name.
         async with conn.execute("SELECT steam_id FROM players") as cur:
@@ -1370,7 +1570,7 @@ async def admin_players(admin_session: Optional[str] = Cookie(None)):
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
     async with db.get_db() as conn:
         async with conn.execute(
-            "SELECT steam_id, rank, credits, funds, total_games, kickstarter_backer, name_color, created_at, updated_at "
+        "SELECT steam_id, rank, credits, funds, total_games, COALESCE(wins, 0) AS wins, COALESCE(losses, 0) AS losses, kickstarter_backer, name_color, created_at, updated_at "
             "FROM players ORDER BY updated_at DESC"
         ) as cur:
             rows = await cur.fetchall()

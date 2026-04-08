@@ -104,10 +104,23 @@ async def bot_state(
         if steam_id:
             all_pending_by_steam.setdefault(steam_id, []).append(pending)
 
+    steam_name_by_id = {}
+    try:
+        import log_server
+
+        id_to_name = log_server.get_id_to_name_map() or {}
+        for steam_id in ingame_players:
+            name = id_to_name.get(steam_id)
+            if name:
+                steam_name_by_id[steam_id] = str(name)
+    except Exception:
+        steam_name_by_id = {}
+
     return {
         "timestamp": int(time.time()),
         "lobbies": lobbies,
         "ingameSteamIds": sorted(ingame_players),
+        "steamNameById": steam_name_by_id,
         "pendingLinksBySteam": pending_links_by_steam,
         "pendingLinks": all_pending_links,
         "pendingLinksBySteamAll": all_pending_by_steam,
@@ -285,3 +298,43 @@ async def bot_leaderboard(
     limit = min(max(1, int(limit or 50)), 1000)
     leaders = await db.get_leaderboard(limit=limit)
     return {"count": len(leaders), "leaderboard": leaders}
+
+
+@router.get("/bot/v1/player-stats/{steam_id}")
+async def bot_player_stats(
+    steam_id: str,
+    x_bot_token: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    if not _is_api_enabled():
+        return JSONResponse({"detail": "Bot API disabled"}, status_code=404)
+    if not _authorized(x_bot_token, authorization):
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+    async with db.get_db() as conn:
+        async with conn.execute(
+            """
+            SELECT
+                steam_id,
+                rank,
+                credits,
+                total_games,
+                COALESCE(wins, 0) AS wins,
+                COALESCE(losses, 0) AS losses,
+                CASE
+                    WHEN (COALESCE(wins, 0) + COALESCE(losses, 0)) > 0
+                    THEN ROUND(100.0 * COALESCE(wins, 0) / (COALESCE(wins, 0) + COALESCE(losses, 0)), 2)
+                    ELSE 0
+                END AS win_rate
+            FROM players
+            WHERE steam_id = ?
+            LIMIT 1
+            """,
+            (steam_id,),
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row:
+        return JSONResponse({"detail": "Player not found"}, status_code=404)
+
+    return dict(row)

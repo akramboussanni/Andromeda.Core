@@ -154,15 +154,17 @@ async def create_player(player: PlayerData):
     async with get_db() as db:
         await db.execute(
             """INSERT OR IGNORE INTO players
-               (steam_id, rank, credits, funds, total_games, kickstarter_backer,
+               (steam_id, rank, credits, funds, total_games, wins, losses, kickstarter_backer,
                 items_json, name_color, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 player.steamId,
                 player.rank,
                 player.credits,
                 player.funds,
                 player.totalGames,
+                player.wins,
+                player.losses,
                 int(player.kickstarterBacker),
                 json.dumps(player.items),
                 player.nameColor,
@@ -202,14 +204,16 @@ async def save_player(player: PlayerData):
     async with get_db() as db:
         await db.execute(
             """INSERT INTO players
-               (steam_id, rank, credits, funds, total_games, kickstarter_backer,
+               (steam_id, rank, credits, funds, total_games, wins, losses, kickstarter_backer,
                 items_json, name_color, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(steam_id) DO UPDATE SET
                    rank=excluded.rank,
                    credits=excluded.credits,
                    funds=excluded.funds,
                    total_games=excluded.total_games,
+                   wins=excluded.wins,
+                   losses=excluded.losses,
                    kickstarter_backer=excluded.kickstarter_backer,
                    items_json=excluded.items_json,
                    name_color=excluded.name_color,
@@ -220,6 +224,8 @@ async def save_player(player: PlayerData):
                 player.credits,
                 player.funds,
                 player.totalGames,
+                player.wins,
+                player.losses,
                 int(player.kickstarterBacker),
                 json.dumps(player.items),
                 player.nameColor,

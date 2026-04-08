@@ -190,6 +190,13 @@ async def stats_new(req: StatsNewRequest):
             if existing:
                 player_data.credits += stat.creditsEarned
                 player_data.totalGames += 1
+
+                won_match = (bool(stat.wasAlien) and bool(req.aliensWon)) or ((not bool(stat.wasAlien)) and bool(req.crewWon))
+                if won_match:
+                    player_data.wins += 1
+                else:
+                    player_data.losses += 1
+
                 await UserService.save(player_data)
 
         response_players.append(

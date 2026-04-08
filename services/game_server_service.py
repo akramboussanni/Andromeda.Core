@@ -29,6 +29,7 @@ HOST_API_BASE_URL = os.getenv("GAME_HOST_API_BASE_URL", "").strip().rstrip("/")
 HOST_API_TOKEN = os.getenv("GAME_HOST_API_TOKEN", "").strip()
 HOST_API_TIMEOUT_SECONDS = int(os.getenv("GAME_HOST_API_TIMEOUT_SECONDS", "8"))
 HOST_API_TRACE = os.getenv("GAME_HOST_API_TRACE", "false").strip().lower() in ("1", "true", "yes", "on")
+SESSION_API_URL = os.getenv("GAME_SESSION_API_URL", "").strip().rstrip("/")
 BOOT_TRIGGER_URL = os.getenv("GAME_HOST_BOOT_TRIGGER_URL", "").strip()
 BOOT_TRIGGER_TOKEN = os.getenv("GAME_HOST_BOOT_TRIGGER_TOKEN", "").strip()
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "").strip()
@@ -543,6 +544,7 @@ def spawn_server(
                     "isPublic": is_public,
                     "gamemode": gamemode,
                     "gamemodeData": gamemode_data,
+                    "apiUrl": SESSION_API_URL or None,
                 },
             )
 
@@ -631,6 +633,9 @@ def spawn_server(
     if is_public:
         args.append("--public")
 
+    if SESSION_API_URL:
+        args.extend(["--api-url", SESSION_API_URL])
+
     try:
         if GAME_RUNTIME_MODE == "docker":
             if not DOCKER_IMAGE:
@@ -644,6 +649,7 @@ def spawn_server(
                 "-p", f"{game_port}:{game_port}/tcp",
                 "-p", f"{voice_port}:{voice_port}/udp",
                 "-e", f"SERVER_HOST={SERVER_HOST}",
+                "-e", f"ANDROMEDA_API_URL={SESSION_API_URL}",
                 DOCKER_IMAGE,
             ]
 

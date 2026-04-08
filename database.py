@@ -1,10 +1,12 @@
-import aiosqlite
 import json
-import time
-import os
 import logging
-from typing import Optional, List
-from models import PlayerData, PlayerCharacterData, PlayerCharacterLevelData
+import os
+import time
+from typing import List, Optional
+
+import aiosqlite
+from db_migrations import run_migrations
+from models import PlayerCharacterData, PlayerCharacterLevelData, PlayerData
 
 logger = logging.getLogger("Database")
 
@@ -12,6 +14,7 @@ DB_PATH = os.getenv("DB_PATH", "./parasite.db")
 
 
 from contextlib import asynccontextmanager
+
 
 @asynccontextmanager
 async def get_db():
@@ -25,79 +28,10 @@ async def get_db():
 
 
 async def init_db():
-    """Create tables if they don't exist."""
+    """Apply pending schema migrations."""
     async with get_db() as db:
-        await db.executescript("""
-            CREATE TABLE IF NOT EXISTS players (
-                steam_id          TEXT PRIMARY KEY,
-                rank              INTEGER NOT NULL DEFAULT 1,
-                credits           REAL    NOT NULL DEFAULT 999999,
-                funds             REAL    NOT NULL DEFAULT 999999,
-                total_games       INTEGER NOT NULL DEFAULT 0,
-                kickstarter_backer INTEGER NOT NULL DEFAULT 1,
-                items_json        TEXT    NOT NULL DEFAULT '[]',
-                created_at        REAL    NOT NULL,
-                updated_at        REAL    NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS player_characters (
-                steam_id          TEXT    NOT NULL,
-                char_guid         TEXT    NOT NULL,
-                ascension         INTEGER NOT NULL DEFAULT 0,
-                level             INTEGER NOT NULL DEFAULT 0,
-                abilities_json    TEXT    NOT NULL DEFAULT '[]',
-                perks_json        TEXT    NOT NULL DEFAULT '[]',
-                skins_json        TEXT    NOT NULL DEFAULT '[]',
-                level_history_json TEXT   NOT NULL DEFAULT '[]',
-                pending_level_json TEXT,
-                PRIMARY KEY (steam_id, char_guid)
-            );
-
-            CREATE TABLE IF NOT EXISTS match_history (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                steam_id        TEXT    NOT NULL,
-                timestamp       TEXT    NOT NULL DEFAULT '',
-                game_id         TEXT    NOT NULL DEFAULT '',
-                game_length     REAL    NOT NULL DEFAULT 0,
-                aliens_won      INTEGER NOT NULL DEFAULT 0,
-                crew_won        INTEGER NOT NULL DEFAULT 0,
-                was_alien       INTEGER NOT NULL DEFAULT 0,
-                character_guid  TEXT    NOT NULL DEFAULT '',
-                ability_guid    TEXT    NOT NULL DEFAULT '',
-                item_guid       TEXT    NOT NULL DEFAULT '',
-                alien_guid      TEXT    NOT NULL DEFAULT '',
-                perk_a          TEXT    NOT NULL DEFAULT '',
-                perk_b          TEXT    NOT NULL DEFAULT '',
-                perk_c          TEXT    NOT NULL DEFAULT ''
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_match_steam ON match_history(steam_id);
-            CREATE INDEX IF NOT EXISTS idx_char_steam  ON player_characters(steam_id);
-
-            CREATE TABLE IF NOT EXISTS log_entries (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                received_at REAL    NOT NULL,
-                ts          TEXT,
-                level       TEXT    NOT NULL DEFAULT 'info',
-                service     TEXT,
-                steam_id    TEXT,
-                session_id  TEXT,
-                game_name   TEXT,
-                game_mode   TEXT,
-                game_region TEXT,
-                version     TEXT,
-                message     TEXT    NOT NULL DEFAULT '',
-                unity_message TEXT,
-                stack       TEXT,
-                extra_json  TEXT    NOT NULL DEFAULT '{}'
-            );
-            CREATE INDEX IF NOT EXISTS idx_log_received ON log_entries(received_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_log_steam    ON log_entries(steam_id);
-            CREATE INDEX IF NOT EXISTS idx_log_level    ON log_entries(level);
-            CREATE INDEX IF NOT EXISTS idx_log_session  ON log_entries(session_id);
-        """)
-        await db.commit()
-    logger.info("[DB] Tables initialised.")
+        await run_migrations(db, logger=logger)
+    logger.info("[DB] Migrations applied.")
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +40,9 @@ async def init_db():
 
 def _row_to_player(row, char_rows) -> PlayerData:
     """Convert raw DB rows into a PlayerData model."""
+    wins = row["wins"] if row["wins"] is not None else 0
+    losses = row["losses"] if row["losses"] is not None else 0
+
     characters: List[PlayerCharacterData] = []
     for cr in char_rows:
         history_raw = json.loads(cr["level_history_json"] or "[]")
@@ -133,7 +70,10 @@ def _row_to_player(row, char_rows) -> PlayerData:
         items=json.loads(row["items_json"]),
         characters=characters,
         totalGames=row["total_games"],
+        wins=wins,
+        losses=losses,
         kickstarterBacker=bool(row["kickstarter_backer"]),
+        nameColor=row["name_color"],
     )
 
 
@@ -215,8 +155,8 @@ async def create_player(player: PlayerData):
         await db.execute(
             """INSERT OR IGNORE INTO players
                (steam_id, rank, credits, funds, total_games, kickstarter_backer,
-                items_json, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+                items_json, name_color, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 player.steamId,
                 player.rank,
@@ -225,6 +165,7 @@ async def create_player(player: PlayerData):
                 player.totalGames,
                 int(player.kickstarterBacker),
                 json.dumps(player.items),
+                player.nameColor,
                 now,
                 now,
             ),
@@ -262,8 +203,8 @@ async def save_player(player: PlayerData):
         await db.execute(
             """INSERT INTO players
                (steam_id, rank, credits, funds, total_games, kickstarter_backer,
-                items_json, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?)
+                items_json, name_color, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(steam_id) DO UPDATE SET
                    rank=excluded.rank,
                    credits=excluded.credits,
@@ -271,6 +212,7 @@ async def save_player(player: PlayerData):
                    total_games=excluded.total_games,
                    kickstarter_backer=excluded.kickstarter_backer,
                    items_json=excluded.items_json,
+                   name_color=excluded.name_color,
                    updated_at=excluded.updated_at""",
             (
                 player.steamId,
@@ -280,6 +222,7 @@ async def save_player(player: PlayerData):
                 player.totalGames,
                 int(player.kickstarterBacker),
                 json.dumps(player.items),
+                player.nameColor,
                 now,
                 now,
             ),
@@ -341,3 +284,236 @@ async def get_match_history(steam_id: str, limit: int = 50) -> list:
             (steam_id, limit),
         ) as cur:
             return await cur.fetchall()
+
+
+async def upsert_discord_link(discord_user_id: str, steam_id: str, discord_username: str = "", status: str = "pending"):
+    """Create a pending Discord -> Steam link. Must be confirmed in-game."""
+    now = time.time()
+    async with get_db() as db:
+        # If this exact pair is currently blocked, preserve the block instead of recreating the row.
+        async with db.execute(
+            """
+            SELECT blocked_until, blocked_forever FROM discord_links
+            WHERE discord_user_id = ? AND steam_id = ?
+            LIMIT 1
+            """,
+            (discord_user_id, steam_id),
+        ) as cur:
+            existing = await cur.fetchone()
+
+        if existing:
+            blocked_until = float(existing["blocked_until"] or 0)
+            blocked_forever = int(existing["blocked_forever"] or 0) == 1
+            if blocked_forever or blocked_until > now:
+                await db.execute(
+                    """
+                    UPDATE discord_links
+                    SET discord_username = ?, updated_at = ?
+                    WHERE discord_user_id = ? AND steam_id = ?
+                    """,
+                    (discord_username, now, discord_user_id, steam_id),
+                )
+                await db.commit()
+                return
+
+        # Delete conflicting links
+        await db.execute("DELETE FROM discord_links WHERE discord_user_id = ? OR steam_id = ?", (discord_user_id, steam_id))
+        await db.execute(
+            """
+            INSERT INTO discord_links 
+            (discord_user_id, steam_id, status, discord_username, blocked_until, blocked_forever, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (discord_user_id, steam_id, status, discord_username, 0, 0, now, now),
+        )
+        await db.commit()
+
+
+async def get_steam_by_discord(discord_user_id: str) -> Optional[str]:
+    """Get confirmed Steam ID for a Discord user."""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT steam_id FROM discord_links WHERE discord_user_id = ? AND status = 'confirmed'",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return row["steam_id"] if row else None
+
+
+async def get_discord_by_steam_ids(steam_ids: List[str]) -> dict:
+    """Get confirmed Discord IDs for Steam IDs."""
+    if not steam_ids:
+        return {}
+    placeholders = ",".join("?" * len(steam_ids))
+    async with get_db() as db:
+        async with db.execute(
+            f"SELECT discord_user_id, steam_id FROM discord_links WHERE steam_id IN ({placeholders}) AND status = 'confirmed'",
+            steam_ids,
+        ) as cur:
+            rows = await cur.fetchall()
+    return {row["steam_id"]: row["discord_user_id"] for row in rows}
+
+
+async def get_all_discord_links() -> list:
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT discord_user_id, steam_id, created_at, updated_at FROM discord_links WHERE status = 'confirmed' ORDER BY updated_at DESC"
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def get_discord_link_record_by_discord(discord_user_id: str) -> Optional[dict]:
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT discord_user_id, steam_id, status, discord_username, blocked_until, blocked_forever, created_at, updated_at FROM discord_links WHERE discord_user_id = ? LIMIT 1",
+            (discord_user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def get_discord_link_record_by_steam(steam_id: str) -> Optional[dict]:
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT discord_user_id, steam_id, status, discord_username, blocked_until, blocked_forever, created_at, updated_at FROM discord_links WHERE steam_id = ? LIMIT 1",
+            (steam_id,),
+        ) as cur:
+            row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def delete_discord_link(discord_user_id: str) -> int:
+    async with get_db() as db:
+        cur = await db.execute("DELETE FROM discord_links WHERE discord_user_id = ?", (discord_user_id,))
+        await db.commit()
+        return int(cur.rowcount or 0)
+
+
+async def delete_discord_link_by_steam(steam_id: str) -> int:
+    async with get_db() as db:
+        cur = await db.execute("DELETE FROM discord_links WHERE steam_id = ? AND status = 'confirmed'", (steam_id,))
+        await db.commit()
+        return int(cur.rowcount or 0)
+
+
+async def get_pending_links_for_steam(steam_id: str) -> list:
+    """Get pending link requests for a Steam ID (for in-game popup)."""
+    now = time.time()
+    async with get_db() as db:
+        async with db.execute(
+            """
+            SELECT discord_user_id, discord_username FROM discord_links 
+            WHERE steam_id = ? 
+            AND status = 'pending'
+            AND blocked_forever = 0
+            AND (blocked_until = 0 OR blocked_until < ?)
+            """,
+            (steam_id, now),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def get_all_pending_links() -> list:
+    now = time.time()
+    async with get_db() as db:
+        async with db.execute(
+            """
+            SELECT discord_user_id, steam_id, discord_username
+            FROM discord_links
+            WHERE status = 'pending'
+            AND blocked_forever = 0
+            AND (blocked_until = 0 OR blocked_until < ?)
+            ORDER BY updated_at DESC
+            """,
+            (now,),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def confirm_discord_link(discord_user_id: str, steam_id: str) -> bool:
+    """Confirm a pending link (called from in-game)."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE discord_links SET status = 'confirmed' WHERE discord_user_id = ? AND steam_id = ?",
+            (discord_user_id, steam_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def block_link_for_24h(discord_user_id: str, steam_id: str) -> bool:
+    """Block a link request for 24 hours."""
+    now = time.time()
+    blocked_until = now + 86400  # 24 hours
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE discord_links SET blocked_until = ? WHERE discord_user_id = ? AND steam_id = ?",
+            (blocked_until, discord_user_id, steam_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def block_link_forever(discord_user_id: str, steam_id: str) -> bool:
+    """Block a link request permanently."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE discord_links SET blocked_forever = 1 WHERE discord_user_id = ? AND steam_id = ?",
+            (discord_user_id, steam_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# Wins/Losses
+# ---------------------------------------------------------------------------
+
+async def increment_win(steam_id: str) -> bool:
+    """Increment wins for a player. Returns True if successful."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE players SET wins = wins + 1 WHERE steam_id = ?",
+            (steam_id,),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def increment_loss(steam_id: str) -> bool:
+    """Increment losses for a player. Returns True if successful."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE players SET losses = losses + 1 WHERE steam_id = ?",
+            (steam_id,),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_leaderboard(limit: int = 50) -> List[dict]:
+    """Get top players sorted by wins (descending), then by win rate."""
+    async with get_db() as db:
+        async with db.execute(
+            """
+            SELECT 
+                steam_id, 
+                wins, 
+                losses,
+                (wins + losses) as total_games,
+                CASE 
+                    WHEN (wins + losses) > 0 THEN ROUND(100.0 * wins / (wins + losses), 2)
+                    ELSE 0
+                END as win_rate
+            FROM players 
+            WHERE (wins + losses) > 0
+            ORDER BY wins DESC, win_rate DESC 
+            LIMIT ?
+            """,
+            (limit,),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(row) for row in rows]

@@ -389,6 +389,102 @@
         "flanking_2",
         "flanking_3"
       ]
+    },
+    {
+      "base_guid": "slow_drip_1",
+      "tiers": [
+        "slow_drip_1",
+        "slow_drip_2",
+        "slow_drip_3"
+      ]
+    },
+    {
+      "base_guid": "lightweight_1",
+      "tiers": [
+        "lightweight_1",
+        "lightweight_2",
+        "lightweight_3"
+      ]
+    },
+    {
+      "base_guid": "scavenger_1",
+      "tiers": [
+        "scavenger_1",
+        "scavenger_2",
+        "scavenger_3"
+      ]
+    },
+    {
+      "base_guid": "thermal_imaging_1",
+      "tiers": [
+        "thermal_imaging_1",
+        "thermal_imaging_2",
+        "thermal_imaging_3"
+      ]
+    },
+    {
+      "base_guid": "nano_serum_1",
+      "tiers": [
+        "nano_serum_1",
+        "nano_serum_2",
+        "nano_serum_3"
+      ]
+    },
+    {
+      "base_guid": "nano_virus_1",
+      "tiers": [
+        "nano_virus_1",
+        "nano_virus_2",
+        "nano_virus_3"
+      ]
+    },
+    {
+      "base_guid": "make_it_rain_1",
+      "tiers": [
+        "make_it_rain_1",
+        "make_it_rain_2",
+        "make_it_rain_3"
+      ]
+    },
+    {
+      "base_guid": "enhanced_alloys_1",
+      "tiers": [
+        "enhanced_alloys_1",
+        "enhanced_alloys_2",
+        "enhanced_alloys_3"
+      ]
+    },
+    {
+      "base_guid": "ship_shape_1",
+      "tiers": [
+        "ship_shape_1",
+        "ship_shape_2",
+        "ship_shape_3"
+      ]
+    },
+    {
+      "base_guid": "armory_specialist_1",
+      "tiers": [
+        "armory_specialist_1",
+        "armory_specialist_2",
+        "armory_specialist_3"
+      ]
+    },
+    {
+      "base_guid": "status_shield_1",
+      "tiers": [
+        "status_shield_1",
+        "status_shield_2",
+        "status_shield_3"
+      ]
+    },
+    {
+      "base_guid": "epinephrine_1",
+      "tiers": [
+        "epinephrine_1",
+        "epinephrine_2",
+        "epinephrine_3"
+      ]
     }
   ]
 }

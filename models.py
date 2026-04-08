@@ -67,7 +67,10 @@ class PlayerData(BaseModel):
     items: List[str]
     characters: List[PlayerCharacterData]
     totalGames: int
+    wins: int = 0
+    losses: int = 0
     kickstarterBacker: bool
+    nameColor: Optional[str] = None
 
 class RegionData(BaseModel):
     region: str
@@ -242,8 +245,15 @@ class ServerReadyRequest(Request):
 class ServerReadyResponse(Response):
     pass
 
+class ServerHeartbeatPlayer(BaseModel):
+    username: str
+    steamId: str
+    rank: int
+    isDead: bool = False
+
 class ServerHeartbeatRequest(Request):
     sessionId: str
+    players: Optional[List[ServerHeartbeatPlayer]] = None
 
 class ServerShutdownRequest(Request):
     sessionId: str
@@ -403,6 +413,15 @@ class AnalyticsNewRequestData(BaseModel):
 class AnalyticsNewRequest(Request):
     userId: str
     data: AnalyticsNewRequestData
+
+class PlayerUpdateColorRequest(Request):
+    steamId: str
+    nameColor: Optional[str] = None
+
+
+class PlayerUpdateRankRequest(Request):
+    steamId: str
+    rank: int
 
 class EmailExistsRequest(Request):
     pass

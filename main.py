@@ -1,20 +1,21 @@
-import asyncio
-import uvicorn
-import logging
 import argparse
+import asyncio
+import logging
 import os
+
+import uvicorn
 from dotenv import load_dotenv
 from utils.console import enable_ansi_colors
 
 load_dotenv()
 enable_ansi_colors()  # enable VT100 on Windows CMD — controlled by ENABLE_ANSI_COLORS in .env
 
+import database as db
+from catalog import Catalog
 from fastapi import FastAPI
-from routes import shared, client, server, admin
+from routes import admin, bot_api, client, server, shared
 from utils.logging_middleware import log_requests_middleware
 from utils.upnp import open_port
-from catalog import Catalog
-import database as db
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("Server")
 
 from contextlib import asynccontextmanager
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,7 +46,7 @@ async def lifespan(app: FastAPI):
 
     # 4. Start TCP log server and wire it into the async event loop
     try:
-        from log_server import start_log_server, init_queue
+        from log_server import init_queue, start_log_server
         start_log_server()
         init_queue(asyncio.get_event_loop())
         logger.info("[INIT] Log server started on :9090, draining to SQLite.")
@@ -54,18 +56,22 @@ async def lifespan(app: FastAPI):
     # 4. Optional UPnP
     if os.getenv("ENABLE_UPNP", "false").lower() == "true":
         logger.info("[INIT] Opening UPnP ports…")
-        open_port(8000, "TCP", "Parasite API")
+        open_port(8000, "TCP", "Andromeda API")
     else:
         logger.info("[INIT] UPnP disabled.")
         
     yield
 
-app = FastAPI(title="Parasite Private Server", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Andromeda Private Server", version="2.0.0", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
 # Middleware
 # ---------------------------------------------------------------------------
-app.middleware("http")(log_requests_middleware)
+if os.getenv("ENABLE_API_REQUEST_LOGGING", "false").lower() == "true":
+    app.middleware("http")(log_requests_middleware)
+    logger.info("[INIT] API request logging middleware enabled.")
+else:
+    logger.info("[INIT] API request logging middleware disabled.")
 
 # ---------------------------------------------------------------------------
 # Routers
@@ -74,18 +80,19 @@ app.include_router(shared.router)
 app.include_router(client.router)
 app.include_router(server.router)
 app.include_router(admin.router)
+app.include_router(bot_api.router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "Parasite Private Server", "version": "2.0.0"}
+    return {"message": "Andromeda Private Server", "version": "2.0.0"}
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Parasite Private Server")
+    parser = argparse.ArgumentParser(description="Andromeda Private Server")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action="store_true", help="Hot-reload (dev only)")

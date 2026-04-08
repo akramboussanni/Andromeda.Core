@@ -1,12 +1,13 @@
+import argparse
 import asyncio
 import json
 import logging
 import os
 import time
-from models import PlayerData
 
 # Import database module to get setup and functions
 import database as db
+from models import PlayerData
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Migrate")
@@ -62,5 +63,44 @@ async def migrate():
     elapsed = time.time() - start_time
     logger.info(f"Migration complete! Successfully migrated {migrated} users in {elapsed:.2f} seconds.")
 
+
+async def apply_schema_migrations():
+    logger.info("Applying schema migrations...")
+    await db.init_db()
+    logger.info("Schema migrations complete.")
+
+
+async def show_schema_migration_status():
+    await db.init_db()
+    async with db.get_db() as conn:
+        async with conn.execute(
+            "SELECT version, name, applied_at FROM schema_migrations ORDER BY version"
+        ) as cur:
+            rows = await cur.fetchall()
+
+    if not rows:
+        logger.info("No migrations applied yet.")
+        return
+
+    logger.info("Applied migrations:")
+    for row in rows:
+        applied_ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row["applied_at"]))
+        logger.info(f"  v{row['version']:03d}_{row['name']} at {applied_ts}")
+
 if __name__ == "__main__":
-    asyncio.run(migrate())
+    parser = argparse.ArgumentParser(description="Andromeda.Core migration utility")
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="schema-upgrade",
+        choices=["schema-upgrade", "schema-status", "import-legacy-json"],
+        help="schema-upgrade: apply schema migrations (default); schema-status: list applied migrations; import-legacy-json: migrate users.json into SQLite",
+    )
+    args = parser.parse_args()
+
+    if args.command == "schema-upgrade":
+        asyncio.run(apply_schema_migrations())
+    elif args.command == "schema-status":
+        asyncio.run(show_schema_migration_status())
+    else:
+        asyncio.run(migrate())

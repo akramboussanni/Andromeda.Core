@@ -65,6 +65,7 @@ def create_party(
         "partyName": party_name,
         "maxPlayers": max_players,
         "isPublic": is_public,
+        "wasPublicAtCreation": is_public,
         "hostSteamId": host_steam_id,
         "players": {host_steam_id: False},
         "ipAddress": ip_address or _default_server_host(),
@@ -157,11 +158,13 @@ def update_player_status(game_id: str, steam_id: str, is_ready: bool) -> bool:
     return True
 
 
-def heartbeat(game_id: str) -> bool:
+def heartbeat(game_id: str, players: Optional[List[dict]] = None) -> bool:
     party = _parties.get(game_id)
     if not party:
         return False
     party["lastHeartbeat"] = time.time()
+    if players is not None:
+        party["players_telemetry"] = players
     return True
 
 
@@ -182,7 +185,10 @@ def list_parties(regions: Optional[List[str]] = None) -> List[PartyListResponseD
     _cleanup_stale()
     result = []
     for game_id, party in _parties.items():
-        if not party["isPublic"]:
+        # Keep intentionally private lobbies hidden, but allow lobbies that were
+        # originally public to remain discoverable even if runtime state later
+        # flips isPublic during match transitions.
+        if not party.get("wasPublicAtCreation", party.get("isPublic", False)):
             continue
         if party["status"] != "ready":
             continue

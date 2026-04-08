@@ -33,6 +33,10 @@ async def log_requests_middleware(request: Request, call_next):
 
     response = await call_next(request)
     
+    # Skip logging for successful responses (2xx status codes)
+    if 200 <= response.status_code < 300:
+        return response
+    
     # DO NOT capture body for StreamingResponse or SSE
     # Starlette's BaseHTTPMiddleware + StreamingResponse = Disaster if you touch the body_iterator
     is_streaming = "text/event-stream" in response.headers.get("content-type", "")

@@ -147,3 +147,40 @@ async def delete_before(received_at: float) -> int:
         )
         await db.commit()
         return cur.rowcount
+
+
+async def count_before(received_at: float) -> int:
+    """Return how many log entries are older than the given Unix timestamp."""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT COUNT(*) AS c FROM log_entries WHERE received_at < ?",
+            (received_at,),
+        ) as cur:
+            row = await cur.fetchone()
+            return int(row["c"] if row else 0)
+
+
+async def delete_before_batched(received_at: float, batch_size: int = 5000) -> int:
+    """
+    Delete up to batch_size entries older than received_at.
+    Returns deleted row count for this batch.
+    """
+    if batch_size <= 0:
+        batch_size = 5000
+
+    async with get_db() as db:
+        cur = await db.execute(
+            """
+            DELETE FROM log_entries
+            WHERE id IN (
+                SELECT id
+                FROM log_entries
+                WHERE received_at < ?
+                ORDER BY id
+                LIMIT ?
+            )
+            """,
+            (received_at, batch_size),
+        )
+        await db.commit()
+        return int(cur.rowcount or 0)

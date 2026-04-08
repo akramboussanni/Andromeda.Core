@@ -775,5 +775,257 @@
     "purchasable": true,
     "cost": 0,
     "tier": 3
+  },
+  {
+    "guid": "slow_drip_1",
+    "name": "Slow Drip 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "slow_drip_2",
+    "name": "Slow Drip 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "slow_drip_3",
+    "name": "Slow Drip 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "lightweight_1",
+    "name": "Lightweight 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "lightweight_2",
+    "name": "Lightweight 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "lightweight_3",
+    "name": "Lightweight 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "scavenger_1",
+    "name": "Scavenger 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "scavenger_2",
+    "name": "Scavenger 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "scavenger_3",
+    "name": "Scavenger 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "thermal_imaging_1",
+    "name": "Thermal Imaging 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "thermal_imaging_2",
+    "name": "Thermal Imaging 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "thermal_imaging_3",
+    "name": "Thermal Imaging 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "nano_serum_1",
+    "name": "Nano Serum 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "nano_serum_2",
+    "name": "Nano Serum 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "nano_serum_3",
+    "name": "Nano Serum 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "nano_virus_1",
+    "name": "Nano Virus 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "nano_virus_2",
+    "name": "Nano Virus 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "nano_virus_3",
+    "name": "Nano Virus 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "make_it_rain_1",
+    "name": "Make It Rain 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "make_it_rain_2",
+    "name": "Make It Rain 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "make_it_rain_3",
+    "name": "Make It Rain 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "enhanced_alloys_1",
+    "name": "Enhanced Alloys 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "enhanced_alloys_2",
+    "name": "Enhanced Alloys 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "enhanced_alloys_3",
+    "name": "Enhanced Alloys 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "ship_shape_1",
+    "name": "Ship Shape 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "ship_shape_2",
+    "name": "Ship Shape 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "ship_shape_3",
+    "name": "Ship Shape 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "armory_specialist_1",
+    "name": "Armory Specialist 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "armory_specialist_2",
+    "name": "Armory Specialist 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "armory_specialist_3",
+    "name": "Armory Specialist 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "status_shield_1",
+    "name": "Status Shield 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "status_shield_2",
+    "name": "Status Shield 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "status_shield_3",
+    "name": "Status Shield 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
+  },
+  {
+    "guid": "epinephrine_1",
+    "name": "Epinephrine 1",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 1
+  },
+  {
+    "guid": "epinephrine_2",
+    "name": "Epinephrine 2",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 2
+  },
+  {
+    "guid": "epinephrine_3",
+    "name": "Epinephrine 3",
+    "purchasable": true,
+    "cost": 0,
+    "tier": 3
   }
 ]

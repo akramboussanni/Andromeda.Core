@@ -1,18 +1,19 @@
+import asyncio
 import hmac
 import os
 import secrets
 import time
+import uuid
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter, Cookie, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel
-
 import database as db
 import logs_db
-import sse_commands
 import services.party_service as ps
+from fastapi import APIRouter, Cookie, Form, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from models import PlayerUpdateColorRequest, PlayerUpdateRankRequest
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -28,6 +29,24 @@ _RATE_LIMIT_WINDOW = 60         # per N seconds
 # In-memory session store  {token: expires_at}
 # ---------------------------------------------------------------------------
 _sessions: dict[str, float] = {}
+
+
+# ---------------------------------------------------------------------------
+# Background log cleanup state
+# ---------------------------------------------------------------------------
+_log_cleanup_job = {
+  "running": False,
+  "job_id": None,
+  "started_at": None,
+  "finished_at": None,
+  "cutoff_timestamp": None,
+  "older_than_seconds": None,
+  "batch_size": None,
+  "target_total": 0,
+  "deleted": 0,
+  "status": "idle",
+  "error": None,
+}
 
 
 def _new_session() -> str:
@@ -81,7 +100,6 @@ def _require_session(session: Optional[str]):
 
 
 def _login_redirect():
-    from fastapi import HTTPException
     # We raise a real redirect rather than HTTPException so headers work
     return _LoginRedirect()
 
@@ -427,6 +445,16 @@ _HTML = r"""<!DOCTYPE html>
               <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
               <button class="btn btn-ghost btn-sm" onclick="clearLogs()" style="color:var(--danger)">🗑 Purge all</button>
             </div>
+            <div style="display:flex;gap:8px;margin-top:18px;align-items:center;">
+              <input type="number" id="cleanup-age-value" class="filter-input" min="1" value="30" style="width:90px;">
+              <select id="cleanup-age-unit" class="filter-select" style="width:110px;">
+                <option value="minutes">minutes</option>
+                <option value="hours">hours</option>
+                <option value="days" selected>days</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="cleanupOldLogs()" style="color:var(--warning)">🧹 Cleanup older than</button>
+              <span id="cleanup-status" style="font-size:12px;color:var(--text-muted);"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -581,6 +609,19 @@ _HTML = r"""<!DOCTYPE html>
     if (page === 'players') loadPlayers();
     if (page === 'sessions') loadSessions();
     if (page === 'logs') { queryLogs(true); loadLogPlayers(); loadPlayersMap(); }
+  }
+
+  // Rank Decoration (matches SidebarPartyPlayer/RankMedalList logic)
+  const TIER_NAMES = ["Recruit", "Ensign", "Lieutenant", "Commander", "Captain", "Admiral"];
+  const SUB_RANKS = ["I", "II", "III", "IV", "V"];
+
+  function getRankName(rank) {
+    if (rank === 0) return "Uncalibrated";
+    const majorIdx = Math.floor(rank / 5);
+    const subIdx = rank % 5;
+    const tier = TIER_NAMES[majorIdx] || "Elite";
+    const sub = SUB_RANKS[subIdx] || "";
+    return `${tier} ${sub}`;
   }
 
   // Identity Map (SteamID -> Name)
@@ -777,6 +818,79 @@ _HTML = r"""<!DOCTYPE html>
     toast('All logs purged');
   }
 
+  let _cleanupPollTimer = null;
+
+  async function cleanupOldLogs() {
+    const valueRaw = Number(document.getElementById('cleanup-age-value').value);
+    const unit = document.getElementById('cleanup-age-unit').value;
+    const value = Number.isFinite(valueRaw) ? Math.floor(valueRaw) : 0;
+    if (value <= 0) {
+      toast('Enter a valid cleanup age', 'error');
+      return;
+    }
+
+    if (!confirm(`Delete logs older than ${value} ${unit}?`)) return;
+
+    try {
+      const started = await apiFetch('/admin/api/logs/cleanup/start', {
+        method: 'POST',
+        body: JSON.stringify({ older_than_value: value, older_than_unit: unit })
+      });
+      toast(`Cleanup started (${started.target_total.toLocaleString()} candidates)`, 'success');
+      startCleanupPolling();
+    } catch (e) {
+      toast('Failed to start cleanup (maybe one is already running)', 'error');
+    }
+  }
+
+  function startCleanupPolling() {
+    if (_cleanupPollTimer) return;
+    fetchCleanupStatus();
+    _cleanupPollTimer = setInterval(fetchCleanupStatus, 1500);
+  }
+
+  function stopCleanupPolling() {
+    if (_cleanupPollTimer) {
+      clearInterval(_cleanupPollTimer);
+      _cleanupPollTimer = null;
+    }
+  }
+
+  async function fetchCleanupStatus() {
+    try {
+      const st = await apiFetch('/admin/api/logs/cleanup/status');
+      const el = document.getElementById('cleanup-status');
+      if (!el) return;
+
+      if (st.running) {
+        const total = Number(st.target_total || 0);
+        const done = Number(st.deleted || 0);
+        const pct = total > 0 ? Math.min(100, Math.floor((done / total) * 100)) : 0;
+        el.textContent = `Running: ${done.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`;
+        return;
+      }
+
+      if (st.status === 'completed') {
+        el.textContent = `Done: deleted ${Number(st.deleted || 0).toLocaleString()} logs`;
+        stopCleanupPolling();
+        queryLogs(true);
+        loadStats();
+        return;
+      }
+
+      if (st.status === 'failed') {
+        el.textContent = `Failed: ${st.error || 'Unknown error'}`;
+        stopCleanupPolling();
+        return;
+      }
+
+      el.textContent = '';
+      stopCleanupPolling();
+    } catch (e) {
+      stopCleanupPolling();
+    }
+  }
+
   async function renderOverviewLogs() {
     try {
       const d = await apiFetch('/admin/api/logs?limit=20');
@@ -800,7 +914,7 @@ _HTML = r"""<!DOCTYPE html>
   let allPlayers = [];
   async function loadPlayers() {
     const tbody = document.getElementById('players-tbody');
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">⏳</div>Loading...</div></td></tr>';
     try {
       allPlayers = await apiFetch('/admin/api/players');
       filterPlayers();
@@ -813,16 +927,63 @@ _HTML = r"""<!DOCTYPE html>
     const search = document.getElementById('player-search').value.toLowerCase();
     const filtered = allPlayers.filter(p => !search || p.steam_id.includes(search));
     const tbody = document.getElementById('players-tbody');
-    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">👤</div>No players found</div></td></tr>'; return; }
+    if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">👤</div>No players found</div></td></tr>'; return; }
     tbody.innerHTML = filtered.map(p => `<tr>
       <td><span class="mono">${esc(p.steam_id)}</span></td>
-      <td>${p.rank}</td>
+      <td>
+        <div style="font-weight:600; color:${p.name_color || 'inherit'}">${getRankName(p.rank)}</div>
+        <div style="font-size:10px;color:var(--text-muted)">Raw Rank: ${p.rank}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <input type="number" min="0" value="${Number(p.rank || 0)}" id="rank-${p.steam_id}" style="width:84px;padding:4px 6px;font-size:12px;" />
+          <button onclick="updatePlayerRank('${p.steam_id}')" style="padding:4px 8px;font-size:11px;">Save</button>
+        </div>
+      </td>
       <td>${Math.round(p.credits).toLocaleString()}</td>
       <td>${p.total_games}</td>
       <td>${p.kickstarter_backer ? '<span class="badge badge-success">YES</span>' : '<span class="badge badge-info">NO</span>'}</td>
+      <td>
+        <input type="color" value="${p.name_color || '#ffffff'}" 
+               onchange="updateNameColor('${p.steam_id}', this.value)" 
+               title="Set name color (TextMeshPro)"
+               style="width:30px;height:20px;border:none;cursor:pointer;background:transparent;">
+        <button onclick="updateNameColor('${p.steam_id}', null)" style="padding:2px 4px;font-size:10px;margin-left:4px;">❌</button>
+      </td>
       <td class="mono">${p.created_at ? new Date(p.created_at*1000).toLocaleDateString() : '—'}</td>
       <td class="mono">${p.updated_at ? new Date(p.updated_at*1000).toLocaleDateString() : '—'}</td>
     </tr>`).join('');
+  }
+
+  async function updateNameColor(steamId, color) {
+    try {
+      await apiFetch('/admin/api/players/color', {
+        method: 'POST',
+        body: JSON.stringify({ steamId, nameColor: color })
+      });
+      toast(`Successfully updated name color for ${steamId}`);
+      loadPlayers();
+    } catch(e) { toast('Failed to update name color', 'error'); }
+  }
+
+  async function updatePlayerRank(steamId) {
+    const input = document.getElementById(`rank-${steamId}`);
+    if (!input) return;
+
+    const parsed = Number.parseInt(input.value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      toast('Rank must be a non-negative integer', 'error');
+      return;
+    }
+
+    try {
+      await apiFetch('/admin/api/players/rank', {
+        method: 'POST',
+        body: JSON.stringify({ steamId, rank: parsed })
+      });
+      toast(`Updated rank for ${steamId} -> ${parsed}`);
+      loadPlayers();
+    } catch(e) {
+      toast('Failed to update rank', 'error');
+    }
   }
 
   // Sessions
@@ -832,16 +993,39 @@ _HTML = r"""<!DOCTYPE html>
     try {
       const sessions = await apiFetch('/admin/api/sessions');
       if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🎮</div>No active sessions</div></td></tr>'; return; }
-      tbody.innerHTML = sessions.map(s => `<tr>
-        <td><span class="mono">${esc(s.game_id.substring(0,8))}…</span></td>
-        <td>${esc(s.party_name)}</td>
-        <td>${esc(s.region)}</td>
-        <td><span class="badge badge-${s.status}">${s.status}</span></td>
-        <td>${s.player_count} / ${s.max_players}</td>
-        <td>${s.is_public ? '✅' : '🔒'}</td>
-        <td><span class="mono">${esc(s.host_steam_id)}</span></td>
-        <td><span class="mono">${esc(s.ip_address)}:${s.port}</span></td>
-      </tr>`).join('');
+      tbody.innerHTML = sessions.map(s => {
+        let playersHtml = '';
+        if (s.players && s.players.length) {
+          playersHtml = `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);background:#00000033;padding:6px 10px;border-radius:4px;border:1px solid #ffffff11;">
+            <div style="font-weight:700;margin-bottom:4px;color:var(--accent);display:flex;justify-content:space-between;border-bottom:1px solid #ffffff08;padding-bottom:2px;font-size:10px;text-transform:uppercase;">
+              <span>Live Leaderboard</span>
+              <span style="opacity:.6">${s.players.length} online</span>
+            </div>
+            ${s.players.map(p => `
+              <div style="display:flex;justify-content:space-between;gap:12px;opacity:${p.isDead?'.5':''};padding:1px 0;">
+                <span style="font-weight:500">${esc(p.username)} ${p.isDead?'💀':''}</span>
+                <span class="mono" style="color:var(--success);font-size:10px;">${getRankName(p.rank)}</span>
+              </div>
+            `).join('')}
+          </div>`;
+        } else {
+          playersHtml = `<div style="margin-top:2px;font-size:11px;color:var(--text-muted);opacity:.5">No live telemetry</div>`;
+        }
+
+        return `<tr>
+          <td><span class="mono">${esc(s.game_id.substring(0,8))}…</span></td>
+          <td>${esc(s.party_name)}</td>
+          <td>${esc(s.region)}</td>
+          <td><span class="badge badge-${s.status}">${s.status}</span></td>
+          <td style="min-width:180px;">
+            <div style="font-weight:600">${s.player_count} / ${s.max_players}</div>
+            ${playersHtml}
+          </td>
+          <td>${s.is_public ? '✅' : '🔒'}</td>
+          <td><span class="mono">${esc(s.host_steam_id)}</span></td>
+          <td><span class="mono">${esc(s.ip_address)}:${s.port}</span></td>
+        </tr>`;
+      }).join('');
     } catch(e) {
       tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">❌</div>Failed to load</div></td></tr>';
     }
@@ -893,6 +1077,7 @@ _HTML = r"""<!DOCTYPE html>
   // Initial load
   loadStats();
   renderOverviewLogs();
+  fetchCleanupStatus();
   // Refresh overview logs every 10s
   setInterval(renderOverviewLogs, 10000);
 </script>
@@ -988,7 +1173,7 @@ async def admin_stats(admin_session: Optional[str] = Cookie(None)):
         "total_log_entries": total_logs,
         "error_count":       error_count,
         "total_games_played": int(total_games),
-        "sse_clients":       sse_commands.connected_count(),
+      "sse_clients":       0,
     }
 
 
@@ -1061,17 +1246,166 @@ async def admin_logs_clear(admin_session: Optional[str] = Cookie(None)):
     return {"status": "cleared", "deleted": deleted}
 
 
+class LogCleanupStartRequest(BaseModel):
+  older_than_value: int = 30
+  older_than_unit: str = "days"
+  batch_size: int = 5000
+
+
+def _cleanup_unit_to_seconds(unit: str) -> int:
+  normalized = (unit or "").strip().lower()
+  table = {
+    "seconds": 1,
+    "second": 1,
+    "minutes": 60,
+    "minute": 60,
+    "hours": 3600,
+    "hour": 3600,
+    "days": 86400,
+    "day": 86400,
+  }
+  return table.get(normalized, 0)
+
+
+async def _run_log_cleanup_job(job_id: str, cutoff_timestamp: float, batch_size: int, older_than_seconds: int):
+  _log_cleanup_job.update({
+    "running": True,
+    "job_id": job_id,
+    "started_at": time.time(),
+    "finished_at": None,
+    "cutoff_timestamp": cutoff_timestamp,
+    "older_than_seconds": older_than_seconds,
+    "batch_size": batch_size,
+    "deleted": 0,
+    "status": "running",
+    "error": None,
+  })
+
+  try:
+    target_total = await logs_db.count_before(cutoff_timestamp)
+    _log_cleanup_job["target_total"] = target_total
+
+    deleted = 0
+    while True:
+      batch_deleted = await logs_db.delete_before_batched(cutoff_timestamp, batch_size=batch_size)
+      if batch_deleted <= 0:
+        break
+
+      deleted += batch_deleted
+      _log_cleanup_job["deleted"] = deleted
+      await asyncio.sleep(0)
+
+    _log_cleanup_job.update({
+      "running": False,
+      "finished_at": time.time(),
+      "deleted": deleted,
+      "status": "completed",
+      "error": None,
+    })
+  except Exception as exc:
+    _log_cleanup_job.update({
+      "running": False,
+      "finished_at": time.time(),
+      "status": "failed",
+      "error": str(exc),
+    })
+
+
+@router.post("/admin/api/logs/cleanup/start")
+async def admin_logs_cleanup_start(
+  body: LogCleanupStartRequest,
+  admin_session: Optional[str] = Cookie(None),
+):
+  if not _authed(admin_session):
+    return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+  if _log_cleanup_job.get("running"):
+    return JSONResponse({"detail": "Cleanup already running"}, status_code=409)
+
+  seconds_per_unit = _cleanup_unit_to_seconds(body.older_than_unit)
+  if body.older_than_value <= 0 or seconds_per_unit <= 0:
+    return JSONResponse({"detail": "Invalid cleanup age"}, status_code=400)
+
+  older_than_seconds = int(body.older_than_value) * int(seconds_per_unit)
+  cutoff_timestamp = time.time() - older_than_seconds
+  batch_size = max(500, min(int(body.batch_size or 5000), 20000))
+
+  job_id = str(uuid.uuid4())
+  target_total = await logs_db.count_before(cutoff_timestamp)
+  _log_cleanup_job.update({
+    "job_id": job_id,
+    "running": True,
+    "status": "starting",
+    "target_total": target_total,
+    "deleted": 0,
+    "error": None,
+    "cutoff_timestamp": cutoff_timestamp,
+    "older_than_seconds": older_than_seconds,
+    "batch_size": batch_size,
+    "started_at": time.time(),
+    "finished_at": None,
+  })
+
+  asyncio.create_task(_run_log_cleanup_job(job_id, cutoff_timestamp, batch_size, older_than_seconds))
+
+  return {
+    "status": "started",
+    "job_id": job_id,
+    "target_total": target_total,
+    "older_than_seconds": older_than_seconds,
+    "batch_size": batch_size,
+  }
+
+
+@router.get("/admin/api/logs/cleanup/status")
+async def admin_logs_cleanup_status(admin_session: Optional[str] = Cookie(None)):
+  if not _authed(admin_session):
+    return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+  return dict(_log_cleanup_job)
+
+
 @router.get("/admin/api/players")
 async def admin_players(admin_session: Optional[str] = Cookie(None)):
     if not _authed(admin_session):
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
     async with db.get_db() as conn:
         async with conn.execute(
-            "SELECT steam_id, rank, credits, funds, total_games, kickstarter_backer, created_at, updated_at "
+            "SELECT steam_id, rank, credits, funds, total_games, kickstarter_backer, name_color, created_at, updated_at "
             "FROM players ORDER BY updated_at DESC"
         ) as cur:
             rows = await cur.fetchall()
     return [dict(r) for r in rows]
+
+
+@router.post("/admin/api/players/color")
+async def update_player_color(body: PlayerUpdateColorRequest, admin_session: Optional[str] = Cookie(None)):
+    if not _authed(admin_session):
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    
+    p = await db.get_player(body.steamId)
+    if not p:
+        return JSONResponse({"detail": "Player not found"}, status_code=404)
+        
+    p.nameColor = body.nameColor
+    await db.save_player(p)
+    return {"status": "ok", "steamId": body.steamId, "nameColor": p.nameColor}
+
+
+@router.post("/admin/api/players/rank")
+async def update_player_rank(body: PlayerUpdateRankRequest, admin_session: Optional[str] = Cookie(None)):
+    if not _authed(admin_session):
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+    if body.rank < 0:
+        return JSONResponse({"detail": "Rank must be non-negative"}, status_code=400)
+
+    p = await db.get_player(body.steamId)
+    if not p:
+        return JSONResponse({"detail": "Player not found"}, status_code=404)
+
+    p.rank = int(body.rank)
+    await db.save_player(p)
+    return {"status": "ok", "steamId": body.steamId, "rank": p.rank}
 
 
 @router.get("/admin/api/sessions")
@@ -1092,6 +1426,7 @@ async def admin_sessions(admin_session: Optional[str] = Cookie(None)):
             "ip_address": party.get("ipAddress", ""),
             "port": party.get("port", 0),
             "last_heartbeat": party.get("lastHeartbeat", 0),
+            "players": party.get("players_telemetry", []),
         })
     return result
 
@@ -1102,17 +1437,35 @@ class BroadcastRequest(BaseModel):
 
 @router.post("/admin/api/broadcast")
 async def admin_broadcast(body: BroadcastRequest, admin_session: Optional[str] = Cookie(None)):
-    if not _authed(admin_session):
-        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
-    count = sse_commands.push("broadcast", {"message": body.message})
-    await logs_db.ingest({"level": "info", "service": "admin", "message": f"ADMIN BROADCAST: {body.message}"})
-    return {"status": "ok", "clients_notified": count}
+  if not _authed(admin_session):
+    return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+  await logs_db.ingest(
+    {
+      "level": "info",
+      "service": "admin",
+      "message": f"ADMIN BROADCAST (DISABLED): {body.message}",
+    }
+  )
+  return {
+    "status": "disabled",
+    "clients_notified": 0,
+    "detail": "SSE command channel is disabled",
+  }
 
 
 @router.post("/admin/api/force-exit")
 async def admin_force_exit(admin_session: Optional[str] = Cookie(None)):
-    if not _authed(admin_session):
-        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
-    count = sse_commands.push("force_exit", {})
-    await logs_db.ingest({"level": "warning", "service": "admin", "message": "ADMIN FORCE EXIT issued"})
-    return {"status": "ok", "clients_notified": count}
+  if not _authed(admin_session):
+    return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+  await logs_db.ingest(
+    {
+      "level": "warning",
+      "service": "admin",
+      "message": "ADMIN FORCE EXIT (DISABLED) issued",
+    }
+  )
+  return {
+    "status": "disabled",
+    "clients_notified": 0,
+    "detail": "SSE command channel is disabled",
+  }

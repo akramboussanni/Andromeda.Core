@@ -96,7 +96,8 @@ async def server_host_status():
 
 @router.post("/server/heartbeat", response_model=Response)
 async def server_heartbeat(req: ServerHeartbeatRequest):
-    if ps.heartbeat(req.sessionId):
+    players_data = [p.dict() for p in req.players] if req.players else None
+    if ps.heartbeat(req.sessionId, players=players_data):
         return Response()
     return Response(status=404, message="Session not found")
 

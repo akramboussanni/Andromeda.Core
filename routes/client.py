@@ -4,9 +4,11 @@ import uuid
 from threading import Lock
 from typing import Optional
 
+import database as db
 import services.auth_service as auth
 import services.party_service as ps
 from fastapi import APIRouter, Header
+from fastapi.responses import JSONResponse
 from models import (
     CharactersLevelsGetRequest,
     CharactersLevelsGetResponse,
@@ -415,6 +417,97 @@ async def players_get(req: PlayersGetRequest, authorization: Optional[str] = Hea
 
     data = await UserService.get_many(req.steamIds or [])
     return PlayersGetResponse(data=data)
+
+
+@router.get("/players/link/requests", response_model=Response)
+async def players_link_requests(authorization: Optional[str] = Header(None)):
+    steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if not steam_id:
+        return Response(status=401, message="Unauthorized", data=None)
+
+    requests = await db.get_pending_links_for_steam(steam_id)
+    return Response(
+        data={
+            "steamId": steam_id,
+            "count": len(requests),
+            "requests": requests,
+        }
+    )
+
+
+@router.post("/players/link/{discord_user_id}/accept", response_model=Response)
+async def players_link_accept(discord_user_id: str, authorization: Optional[str] = Header(None)):
+    steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if not steam_id:
+        return Response(status=401, message="Unauthorized", data=None)
+
+    confirmed = await db.confirm_discord_link(discord_user_id, steam_id)
+    if not confirmed:
+        return Response(
+            status=404,
+            message="Link request not found",
+            data={"confirmed": False, "discordUserId": discord_user_id, "steamId": steam_id},
+        )
+
+    return Response(
+        data={"confirmed": True, "discordUserId": discord_user_id, "steamId": steam_id}
+    )
+
+
+@router.post("/players/link/{discord_user_id}/block", response_model=Response)
+async def players_link_block(
+    discord_user_id: str,
+    block_duration: str = "24h",
+    authorization: Optional[str] = Header(None),
+):
+    steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if not steam_id:
+        return Response(status=401, message="Unauthorized", data=None)
+
+    if block_duration == "forever":
+        blocked = await db.block_link_forever(discord_user_id, steam_id)
+        blocked_value = "forever"
+    else:
+        blocked = await db.block_link_for_24h(discord_user_id, steam_id)
+        blocked_value = "24h"
+
+    if not blocked:
+        return Response(
+            status=404,
+            message="Link request not found",
+            data={
+                "blocked": False,
+                "blockDuration": blocked_value,
+                "discordUserId": discord_user_id,
+                "steamId": steam_id,
+            },
+        )
+
+    return Response(
+        data={
+            "blocked": True,
+            "blockDuration": blocked_value,
+            "discordUserId": discord_user_id,
+            "steamId": steam_id,
+        }
+    )
+
+
+@router.post("/players/link/unlink", response_model=Response)
+async def players_link_unlink(authorization: Optional[str] = Header(None)):
+    steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if not steam_id:
+        return Response(status=401, message="Unauthorized", data=None)
+
+    deleted = await db.delete_discord_link_by_steam(steam_id)
+    if not deleted:
+        return Response(
+            status=404,
+            message="Link not found",
+            data={"unlinked": False, "steamId": steam_id},
+        )
+
+    return Response(data={"unlinked": True, "steamId": steam_id})
 
 
 # ===========================================================================
@@ -876,35 +969,7 @@ async def bundles_promos_unlock():
 
 @router.get("/client/events")
 async def client_events():
-    """
-    Server-Sent Events stream. Mod connects once and receives admin commands
-    (broadcast, force_exit) instantly as they are issued. No polling, no TTL.
-    New joiners connect fresh and only receive commands issued after connection.
-    """
-    import asyncio
-    import sse_commands
-    from fastapi.responses import StreamingResponse
-
-    q = await sse_commands.subscribe()
-
-    async def stream():
-        try:
-            while True:
-                try:
-                    # Send a ping event every 20s. Using a real event named 'ping' 
-                    # is often more reliable than SSE comments (:) for modern proxies/Cloudflare.
-                    msg = await asyncio.wait_for(q.get(), timeout=20.0)
-                    yield msg
-                except asyncio.TimeoutError:
-                    yield "event: ping\ndata: {}\n\n"
-        finally:
-            sse_commands.unsubscribe(q)
-
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # disable nginx buffering
-        },
+    return JSONResponse(
+        {"status": "disabled", "detail": "SSE client command channel is disabled"},
+        status_code=410,
     )

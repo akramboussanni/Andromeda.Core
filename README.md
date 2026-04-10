@@ -26,6 +26,7 @@ Andromeda.Core is the control-plane API for matchmaking, party lifecycle, player
 - GAME_HOST_API_TOKEN
 - GAME_HOST_API_TIMEOUT_SECONDS
 - GAME_SESSION_API_URL (explicit API URL injected into each launched game session)
+- GAME_SERVER_SPAWN_DEBUG (when true, Core appends --debug to spawned game servers)
 - GAME_HOST_BOOT_PROVIDER=none|webhook|gcloud
 - GAME_HOST_BOOT_TRIGGER_URL
 - GAME_HOST_BOOT_TRIGGER_TOKEN

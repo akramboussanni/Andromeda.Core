@@ -439,14 +439,6 @@
       ]
     },
     {
-      "base_guid": "make_it_rain_1",
-      "tiers": [
-        "make_it_rain_1",
-        "make_it_rain_2",
-        "make_it_rain_3"
-      ]
-    },
-    {
       "base_guid": "enhanced_alloys_1",
       "tiers": [
         "enhanced_alloys_1",
@@ -455,11 +447,11 @@
       ]
     },
     {
-      "base_guid": "ship_shape_1",
+      "base_guid": "shipshape_1",
       "tiers": [
-        "ship_shape_1",
-        "ship_shape_2",
-        "ship_shape_3"
+        "shipshape_1",
+        "shipshape_2",
+        "shipshape_3"
       ]
     },
     {

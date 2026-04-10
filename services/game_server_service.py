@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import secrets
 import socket
 import subprocess
 import threading
@@ -56,6 +57,7 @@ DOCKER_ENTRYPOINT = os.getenv("GAME_SERVER_DOCKER_ENTRYPOINT", "wine ./enemy-on-
 BOOT_RETRY_SECONDS = int(os.getenv("GAME_HOST_BOOT_RETRY_SECONDS", "30"))
 BOOT_WARMUP_SECONDS = int(os.getenv("GAME_HOST_BOOT_WARMUP_SECONDS", "180"))
 BOOT_WAIT_MESSAGE = os.getenv("GAME_HOST_BOOT_WAIT_MESSAGE", "Please wait a little, servers are booting.")
+GAME_SERVER_SPAWN_DEBUG = os.getenv("GAME_SERVER_SPAWN_DEBUG", "false").strip().lower() in ("1", "true", "yes", "on")
 
 _boot_lock = threading.Lock()
 _last_boot_request_at = 0.0
@@ -65,6 +67,7 @@ _resolved_server_host_at = 0.0
 _port_lock = threading.Lock()
 _used_ports = set()
 _session_runtime = {}
+_session_spawn_config = {}
 _gcp_credentials_lock = threading.Lock()
 _gcp_credentials = None
 _last_session_activity_at = time.time()
@@ -502,13 +505,107 @@ def _release_port_pair(session_id: str):
         _used_ports.discard(state["voicePort"])
 
 
+def _generate_channel_code() -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _ensure_session_channel(session_id: str) -> tuple[str, str]:
+    state = _session_runtime.get(session_id)
+    if state and state.get("channelCode") and state.get("channelKey"):
+        return str(state["channelCode"]), str(state["channelKey"])
+
+    code = _generate_channel_code()
+    key = secrets.token_urlsafe(32)
+    if state is None:
+        _session_runtime[session_id] = {}
+        state = _session_runtime[session_id]
+    state["channelCode"] = code
+    state["channelKey"] = key
+    return code, key
+
+
+def get_session_channel(session_id: str) -> dict | None:
+    state = _session_runtime.get(session_id)
+    if not state:
+        return None
+
+    code = state.get("channelCode")
+    key = state.get("channelKey")
+    if not code or not key:
+        return None
+
+    return {
+        "channelCode": str(code),
+        "channelKey": str(key),
+    }
+
+
+def _trim_spawn_config_locked(now: float | None = None) -> None:
+    current = now or time.time()
+    stale = [
+        sid
+        for sid, value in _session_spawn_config.items()
+        if float(value.get("expiresAt") or 0) <= current
+    ]
+    for sid in stale:
+        _session_spawn_config.pop(sid, None)
+
+
+def set_session_spawn_config(
+    source_session_id: str,
+    one_player_mode: bool | None = None,
+    max_players: int | None = None,
+    ttl_seconds: int = 900,
+) -> dict:
+    session_norm = (source_session_id or "").strip()
+    if not session_norm:
+        raise ValueError("source_session_id is required")
+
+    now = time.time()
+    ttl = max(30, min(int(ttl_seconds or 900), 7200))
+    with _port_lock:
+        _trim_spawn_config_locked(now)
+        existing = dict(_session_spawn_config.get(session_norm) or {})
+
+        if one_player_mode is not None:
+            existing["onePlayerMode"] = bool(one_player_mode)
+        if max_players is not None:
+            parsed = int(max_players)
+            if parsed < 1 or parsed > 64:
+                raise ValueError("max_players must be between 1 and 64")
+            existing["maxPlayers"] = parsed
+
+        if bool(existing.get("onePlayerMode")):
+            existing["maxPlayers"] = 1
+
+        existing["updatedAt"] = now
+        existing["expiresAt"] = now + ttl
+        _session_spawn_config[session_norm] = existing
+        return dict(existing)
+
+
+def consume_session_spawn_config(source_session_id: str) -> dict | None:
+    session_norm = (source_session_id or "").strip()
+    if not session_norm:
+        return None
+
+    now = time.time()
+    with _port_lock:
+        _trim_spawn_config_locked(now)
+        value = _session_spawn_config.pop(session_norm, None)
+        return dict(value) if value else None
+
+
 def spawn_server(
     region: str,
     name: str,
     session_id: str,
     is_public: bool,
+    max_players: int = 12,
     gamemode: str = "CustomParty",
     gamemode_data=None,
+    one_player_mode: bool = False,
 ) -> int:
     """
     Spawns a new game server process on an available port.
@@ -522,7 +619,10 @@ def spawn_server(
         logger.error(f"[GAMESERVER] Unsupported GAME_SESSION_PROVIDER={GAME_SESSION_PROVIDER}")
         return -1
 
+    effective_max_players = 1 if one_player_mode else max_players
+
     if GAME_SESSION_PROVIDER == "host-api":
+        channel_code, channel_key = _ensure_session_channel(session_id)
         if BOOT_PROVIDER == "gcloud":
             try:
                 instance_status = _gcp_instance_status()
@@ -542,9 +642,13 @@ def spawn_server(
                     "name": name,
                     "sessionId": session_id,
                     "isPublic": is_public,
+                    "maxPlayers": effective_max_players,
                     "gamemode": gamemode,
                     "gamemodeData": gamemode_data,
+                    "onePlayerMode": bool(one_player_mode),
                     "apiUrl": SESSION_API_URL or None,
+                    "channelCode": channel_code,
+                    "channelKey": channel_key,
                 },
             )
 
@@ -558,6 +662,8 @@ def spawn_server(
                     "gamePort": game_port,
                     "voicePort": voice_port,
                     "createdAt": time.time(),
+                    "channelCode": channel_code,
+                    "channelKey": channel_key,
                 }
                 _mark_session_activity()
                 return game_port
@@ -613,7 +719,14 @@ def spawn_server(
         "--session-id", session_id,
         "--name", name,
         "--mode", gamemode,
+        "--max-players", str(effective_max_players),
     ]
+
+    if one_player_mode:
+        args.append("--one-player-mode")
+
+    channel_code, channel_key = _ensure_session_channel(session_id)
+    args.extend(["--channel-code", channel_code, "--channel-key", channel_key])
 
     if gamemode_data is not None:
         try:
@@ -636,6 +749,9 @@ def spawn_server(
     if SESSION_API_URL:
         args.extend(["--api-url", SESSION_API_URL])
 
+    if GAME_SERVER_SPAWN_DEBUG:
+        args.append("--debug")
+
     try:
         if GAME_RUNTIME_MODE == "docker":
             if not DOCKER_IMAGE:
@@ -650,6 +766,7 @@ def spawn_server(
                 "-p", f"{voice_port}:{voice_port}/udp",
                 "-e", f"SERVER_HOST={SERVER_HOST}",
                 "-e", f"ANDROMEDA_API_URL={SESSION_API_URL}",
+                "-e", f"ANDROMEDA_ONE_PLAYER_MODE={'1' if one_player_mode else '0'}",
                 DOCKER_IMAGE,
             ]
 
@@ -666,6 +783,8 @@ def spawn_server(
                 "gamePort": game_port,
                 "voicePort": voice_port,
                 "createdAt": time.time(),
+                "channelCode": channel_code,
+                "channelKey": channel_key,
             }
             _mark_session_activity()
             return game_port
@@ -673,7 +792,12 @@ def spawn_server(
         cmd = [GAME_EXE] + args
         logger.info(f"[GAMESERVER] Executing: {' '.join(cmd)}")
         flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
-        proc = subprocess.Popen(cmd, creationflags=flags)
+        env = os.environ.copy()
+        env["ANDROMEDA_ONE_PLAYER_MODE"] = "1" if one_player_mode else "0"
+        env["ANDROMEDA_MAX_PLAYERS"] = str(effective_max_players)
+        if GAME_SERVER_SPAWN_DEBUG:
+            env["ANDROMEDA_FORCE_VERBOSE_DEBUG"] = "1"
+        proc = subprocess.Popen(cmd, creationflags=flags, env=env)
         _session_runtime[session_id] = {
             "runtime": "process",
             "pid": proc.pid,
@@ -681,6 +805,9 @@ def spawn_server(
             "gamePort": game_port,
             "voicePort": voice_port,
             "createdAt": time.time(),
+            "channelCode": channel_code,
+            "channelKey": channel_key,
+            "onePlayerMode": bool(one_player_mode),
         }
         _mark_session_activity()
         logger.info(f"[GAMESERVER] Process started on gamePort={game_port} voicePort={voice_port} session={session_id}")

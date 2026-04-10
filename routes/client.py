@@ -6,6 +6,7 @@ from typing import Optional
 
 import database as db
 import services.auth_service as auth
+import services.command_channel as command_channel
 import services.party_service as ps
 from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
@@ -46,7 +47,12 @@ from models import (
     PlayersGetResponse,
     Response,
 )
-from services.game_server_service import get_boot_wait_message, spawn_server
+from pydantic import BaseModel
+from services.game_server_service import (
+    consume_session_spawn_config,
+    get_boot_wait_message,
+    spawn_server,
+)
 from services.progression_service import ProgressionService
 from services.user_service import UserService
 
@@ -66,6 +72,14 @@ _recent_spawns = {}
 _inflight_spawns = set()
 _recent_global_spawns = {}
 _inflight_global_spawns = set()
+
+
+class PublishCommandRequest(BaseModel):
+    kind: str
+    payload: Optional[dict] = None
+    targetProcess: Optional[str] = None
+    targetSessionId: Optional[str] = None
+    ttlSeconds: Optional[int] = 180
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +214,62 @@ def _end_global_spawn(global_spawn_key: str):
 # PARTY ROUTES
 # ===========================================================================
 
+
+@router.get("/commands")
+async def client_commands(
+    authorization: Optional[str] = Header(None),
+    session_id: Optional[str] = Header(None, alias="Session-Id"),
+    process: Optional[str] = None,
+    sessionId: Optional[str] = None,
+    limit: int = 50,
+):
+    steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if steam_id != "DEDICATED_SERVER_TOKEN":
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+
+    effective_session = sessionId or session_id
+    process_norm = (process or "").strip().lower() or None
+
+    identity = steam_id or "anon"
+    consumer_id = f"{identity}:{process_norm or 'unknown'}:{effective_session or 'none'}"
+
+    commands = command_channel.pull_commands(
+        consumer_id=consumer_id,
+        process=process_norm,
+        session_id=effective_session,
+        limit=limit,
+    )
+    legacy = command_channel.get_legacy_snapshot()
+
+    return {
+        "broadcast": legacy["broadcast"],
+        "force_exit": legacy["force_exit"],
+        "commands": commands,
+    }
+
+
+@router.post("/commands/publish")
+async def client_commands_publish(
+    body: PublishCommandRequest,
+    authorization: Optional[str] = Header(None),
+):
+    steam_id = await auth.get_steam_id(_auth_hdr(authorization))
+    if steam_id != "DEDICATED_SERVER_TOKEN":
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+    target_session = (body.targetSessionId or "").strip() or None
+
+    cmd = command_channel.enqueue_command(
+        kind=body.kind,
+        payload=body.payload or {},
+        target_process=body.targetProcess,
+        target_session_id=target_session,
+        source=steam_id,
+        ttl_seconds=body.ttlSeconds or 180,
+    )
+
+    return {"status": "ok", "commandId": cmd["id"]}
+
 @router.post("/party/create", response_model=PartyCreateResponse)
 async def party_create(
     request: PartyCreateRequest, authorization: Optional[str] = Header(None)
@@ -252,6 +322,7 @@ async def party_create(
             name=request.partyName,
             session_id=game_id,
             is_public=request.isPublic,
+            max_players=request.maxPlayers,
         )
 
         if port == -2:
@@ -597,13 +668,25 @@ async def games_new(
 
     try:
         session_id = str(uuid.uuid4())
+        spawn_config = consume_session_spawn_config(source_session_id) if source_session_id else None
+        effective_max_players = req.maxPlayers
+        one_player_mode = False
+        if spawn_config:
+            if bool(spawn_config.get("onePlayerMode")):
+                one_player_mode = True
+                effective_max_players = 1
+            elif isinstance(spawn_config.get("maxPlayers"), int):
+                effective_max_players = int(spawn_config["maxPlayers"])
+
         port = spawn_server(
             region=req.region,
             name=req.gameName,
             session_id=session_id,
             is_public=req.isPublic,
+            max_players=effective_max_players,
             gamemode=req.gamemodeName,
             gamemode_data=req.gamemodeData,
+            one_player_mode=one_player_mode,
         )
         if port == -2:
             return GamesNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
@@ -617,7 +700,7 @@ async def games_new(
             party_name=req.gameName,
             is_public=req.isPublic,
             host_steam_id="server",
-            max_players=req.maxPlayers,
+            max_players=effective_max_players,
             port=port,
             voice_port=(port + 1),
             game_id=session_id,
@@ -682,13 +765,25 @@ async def games_custom_new(
 
     try:
         session_id = str(uuid.uuid4())
+        spawn_config = consume_session_spawn_config(source_session_id) if source_session_id else None
+        effective_max_players = req.maxPlayers
+        one_player_mode = False
+        if spawn_config:
+            if bool(spawn_config.get("onePlayerMode")):
+                one_player_mode = True
+                effective_max_players = 1
+            elif isinstance(spawn_config.get("maxPlayers"), int):
+                effective_max_players = int(spawn_config["maxPlayers"])
+
         port = spawn_server(
             region=req.region,
             name=f"Custom-{req.gamemodeName}",
             session_id=session_id,
             is_public=False,
+            max_players=effective_max_players,
             gamemode=req.gamemodeName,
             gamemode_data=req.gamemodeData,
+            one_player_mode=one_player_mode,
         )
         if port == -2:
             return GamesCustomNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
@@ -700,7 +795,7 @@ async def games_custom_new(
             party_name=f"Custom-{req.gamemodeName}",
             is_public=False,
             host_steam_id="server",
-            max_players=req.maxPlayers,
+            max_players=effective_max_players,
             port=port,
             voice_port=(port + 1),
             game_id=session_id,

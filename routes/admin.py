@@ -9,6 +9,7 @@ from typing import Optional
 
 import database as db
 import logs_db
+import services.command_channel as command_channel
 import services.party_service as ps
 from fastapi import APIRouter, Cookie, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -727,7 +728,7 @@ _HTML = r"""<!DOCTYPE html>
     const adjusted = raw - 1;
     const majorIdx = Math.floor(adjusted / 5);
     const subIdx = adjusted % 5;
-    const tier = TIER_NAMES[majorIdx] || "Elite";
+    const tier = TIER_NAMES[Math.max(0, Math.min(majorIdx, TIER_NAMES.length - 1))] || TIER_NAMES[0];
     const sub = SUB_RANKS[subIdx] || "";
     return `${tier} ${sub}`;
   }
@@ -770,10 +771,6 @@ _HTML = r"""<!DOCTYPE html>
         option.textContent = tierName;
         majorSel.appendChild(option);
       });
-      const elite = document.createElement('option');
-      elite.value = String(TIER_NAMES.length);
-      elite.textContent = 'Elite';
-      majorSel.appendChild(elite);
     }
 
     const parts = rankToMajorSub(currentRank);
@@ -1635,21 +1632,38 @@ class BroadcastRequest(BaseModel):
     message: str
 
 
+class AdminCommandEnqueueRequest(BaseModel):
+  kind: str
+  payload: dict = {}
+  targetProcess: Optional[str] = None
+  targetSessionId: Optional[str] = None
+  ttlSeconds: Optional[int] = 180
+
+
 @router.post("/admin/api/broadcast")
 async def admin_broadcast(body: BroadcastRequest, admin_session: Optional[str] = Cookie(None)):
   if not _authed(admin_session):
     return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+  cmd = command_channel.enqueue_command(
+    kind="broadcast",
+    payload={"message": body.message},
+    target_process="any",
+    target_session_id=None,
+    source="admin",
+    ttl_seconds=180,
+  )
+
   await logs_db.ingest(
     {
       "level": "info",
       "service": "admin",
-      "message": f"ADMIN BROADCAST (DISABLED): {body.message}",
+      "message": f"ADMIN BROADCAST queued id={cmd['id']}: {body.message}",
     }
   )
   return {
-    "status": "disabled",
-    "clients_notified": 0,
-    "detail": "SSE command channel is disabled",
+    "status": "ok",
+    "commandId": cmd["id"],
   }
 
 
@@ -1657,15 +1671,49 @@ async def admin_broadcast(body: BroadcastRequest, admin_session: Optional[str] =
 async def admin_force_exit(admin_session: Optional[str] = Cookie(None)):
   if not _authed(admin_session):
     return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+  cmd = command_channel.enqueue_command(
+    kind="force_exit",
+    payload={"message": "Admin requested force exit"},
+    target_process="any",
+    target_session_id=None,
+    source="admin",
+    ttl_seconds=180,
+  )
+
   await logs_db.ingest(
     {
       "level": "warning",
       "service": "admin",
-      "message": "ADMIN FORCE EXIT (DISABLED) issued",
+      "message": f"ADMIN FORCE EXIT queued id={cmd['id']}",
     }
   )
   return {
-    "status": "disabled",
-    "clients_notified": 0,
-    "detail": "SSE command channel is disabled",
+    "status": "ok",
+    "commandId": cmd["id"],
   }
+
+
+@router.post("/admin/api/commands/enqueue")
+async def admin_enqueue_command(body: AdminCommandEnqueueRequest, admin_session: Optional[str] = Cookie(None)):
+  if not _authed(admin_session):
+    return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+  cmd = command_channel.enqueue_command(
+    kind=body.kind,
+    payload=body.payload or {},
+    target_process=body.targetProcess,
+    target_session_id=body.targetSessionId,
+    source="admin",
+    ttl_seconds=body.ttlSeconds or 180,
+  )
+
+  await logs_db.ingest(
+    {
+      "level": "info",
+      "service": "admin",
+      "message": f"ADMIN COMMAND queued id={cmd['id']} kind={cmd['kind']} targetProcess={cmd.get('targetProcess')} targetSessionId={cmd.get('targetSessionId')}",
+    }
+  )
+
+  return {"status": "ok", "commandId": cmd["id"]}

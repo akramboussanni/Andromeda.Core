@@ -19,10 +19,13 @@ from models import (
     StatsNewResponse,
     StatsNewResponsePlayer,
 )
+from pydantic import BaseModel
 from services.game_server_service import (
     get_host_boot_state,
     get_server_host,
+    get_session_channel,
     get_session_ports,
+    set_session_spawn_config,
     stop_session,
 )
 from starlette.background import BackgroundTask
@@ -117,6 +120,64 @@ async def server_session_ports(session_id: str):
     if not ports:
         return Response(status=404, message="Session not found", data=None)
     return Response(data=ports)
+
+
+class SessionSpawnConfigPublishRequest(BaseModel):
+    onePlayerMode: Optional[bool] = None
+    maxPlayers: Optional[int] = None
+    ttlSeconds: Optional[int] = 900
+    source: Optional[str] = None
+
+
+def _verify_session_channel_access(session_id: str, channel_code: Optional[str], channel_key: Optional[str]):
+    channel = get_session_channel(session_id)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Unknown session channel")
+
+    if (channel_code or "").strip() != (channel.get("channelCode") or ""):
+        raise HTTPException(status_code=401, detail="Invalid session channel code")
+
+    if (channel_key or "").strip() != (channel.get("channelKey") or ""):
+        raise HTTPException(status_code=401, detail="Invalid session channel key")
+
+
+@router.post("/server/session/{session_id}/spawn-config", response_model=Response)
+async def server_session_spawn_config_publish(
+    session_id: str,
+    body: SessionSpawnConfigPublishRequest,
+    x_channel_code: Optional[str] = Header(None, alias="X-Channel-Code"),
+    x_channel_key: Optional[str] = Header(None, alias="X-Channel-Key"),
+    x_process: Optional[str] = Header(None, alias="X-Process"),
+):
+    _verify_session_channel_access(session_id, x_channel_code, x_channel_key)
+
+    process = (x_process or "").strip().lower()
+    if process != "lobby":
+        return Response(status=403, message="X-Process must be 'lobby'", data=None)
+
+    if body.onePlayerMode is None and body.maxPlayers is None:
+        return Response(status=400, message="At least one spawn config field is required", data=None)
+
+    max_players = body.maxPlayers
+    if max_players is not None and (max_players < 1 or max_players > 64):
+        return Response(status=400, message="maxPlayers must be between 1 and 64", data=None)
+
+    try:
+        applied = set_session_spawn_config(
+            source_session_id=session_id,
+            one_player_mode=body.onePlayerMode,
+            max_players=max_players,
+            ttl_seconds=body.ttlSeconds or 900,
+        )
+    except ValueError as exc:
+        return Response(status=400, message=str(exc), data=None)
+
+    return Response(data={
+        "stored": True,
+        "sessionId": session_id,
+        "source": body.source or "lobby",
+        "spawnConfig": applied,
+    })
 
 
 @router.get("/build/managed-zip")

@@ -170,7 +170,7 @@ class LevelsGetRequest(Request):
 class GamesCustomNewRequest(Request):
     version: Optional[str] = None
     region: str
-    maxPlayers: int = 8
+    maxPlayers: int = 12
     gamemodeName: str
     gamemodeData: Optional[object] = None
 
@@ -366,7 +366,7 @@ class PartyCreateRequest(Request):
     partyName: str
     partyToken: Optional[str] = None
     isPublic: bool
-    maxPlayers: int = 8
+    maxPlayers: int = 12
 
 class PartyCreateResponse(Response):
     data: Optional[JoinData] = None

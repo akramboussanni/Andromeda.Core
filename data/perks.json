@@ -945,21 +945,21 @@
     "tier": 3
   },
   {
-    "guid": "ship_shape_1",
+    "guid": "shipshape_1",
     "name": "Ship Shape 1",
     "purchasable": true,
     "cost": 0,
     "tier": 1
   },
   {
-    "guid": "ship_shape_2",
+    "guid": "shipshape_2",
     "name": "Ship Shape 2",
     "purchasable": true,
     "cost": 0,
     "tier": 2
   },
   {
-    "guid": "ship_shape_3",
+    "guid": "shipshape_3",
     "name": "Ship Shape 3",
     "purchasable": true,
     "cost": 0,

@@ -556,6 +556,7 @@ def set_session_spawn_config(
     source_session_id: str,
     one_player_mode: bool | None = None,
     max_players: int | None = None,
+    party_leader_steam_id: str | None = None,
     ttl_seconds: int = 900,
 ) -> dict:
     session_norm = (source_session_id or "").strip()
@@ -575,6 +576,8 @@ def set_session_spawn_config(
             if parsed < 1 or parsed > 64:
                 raise ValueError("max_players must be between 1 and 64")
             existing["maxPlayers"] = parsed
+        if party_leader_steam_id is not None:
+            existing["partyLeaderSteamId"] = str(party_leader_steam_id).strip()
 
         if bool(existing.get("onePlayerMode")):
             existing["maxPlayers"] = 1
@@ -606,6 +609,7 @@ def spawn_server(
     gamemode: str = "CustomParty",
     gamemode_data=None,
     one_player_mode: bool = False,
+    party_leader_steam_id: str | None = None,
 ) -> int:
     """
     Spawns a new game server process on an available port.
@@ -724,6 +728,9 @@ def spawn_server(
 
     if one_player_mode:
         args.append("--one-player-mode")
+
+    if party_leader_steam_id:
+        args.extend(["--party-leader-steam-id", str(party_leader_steam_id)])
 
     channel_code, channel_key = _ensure_session_channel(session_id)
     args.extend(["--channel-code", channel_code, "--channel-key", channel_key])

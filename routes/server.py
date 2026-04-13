@@ -127,6 +127,7 @@ class SessionSpawnConfigPublishRequest(BaseModel):
     maxPlayers: Optional[int] = None
     ttlSeconds: Optional[int] = 900
     source: Optional[str] = None
+    partyLeaderSteamId: Optional[str] = None
 
 
 def _verify_session_channel_access(session_id: str, channel_code: Optional[str], channel_key: Optional[str]):
@@ -155,7 +156,7 @@ async def server_session_spawn_config_publish(
     if process != "lobby":
         return Response(status=403, message="X-Process must be 'lobby'", data=None)
 
-    if body.onePlayerMode is None and body.maxPlayers is None:
+    if body.onePlayerMode is None and body.maxPlayers is None and body.partyLeaderSteamId is None:
         return Response(status=400, message="At least one spawn config field is required", data=None)
 
     max_players = body.maxPlayers
@@ -167,6 +168,7 @@ async def server_session_spawn_config_publish(
             source_session_id=session_id,
             one_player_mode=body.onePlayerMode,
             max_players=max_players,
+            party_leader_steam_id=body.partyLeaderSteamId,
             ttl_seconds=body.ttlSeconds or 900,
         )
     except ValueError as exc:

@@ -671,12 +671,16 @@ async def games_new(
         spawn_config = consume_session_spawn_config(source_session_id) if source_session_id else None
         effective_max_players = req.maxPlayers
         one_player_mode = False
+        party_leader_steam_id = None
+
         if spawn_config:
             if bool(spawn_config.get("onePlayerMode")):
                 one_player_mode = True
                 effective_max_players = 1
             elif isinstance(spawn_config.get("maxPlayers"), int):
                 effective_max_players = int(spawn_config["maxPlayers"])
+            
+            party_leader_steam_id = spawn_config.get("partyLeaderSteamId")
 
         port = spawn_server(
             region=req.region,
@@ -687,6 +691,7 @@ async def games_new(
             gamemode=req.gamemodeName,
             gamemode_data=req.gamemodeData,
             one_player_mode=one_player_mode,
+            party_leader_steam_id=party_leader_steam_id,
         )
         if port == -2:
             return GamesNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)
@@ -768,12 +773,16 @@ async def games_custom_new(
         spawn_config = consume_session_spawn_config(source_session_id) if source_session_id else None
         effective_max_players = req.maxPlayers
         one_player_mode = False
+        party_leader_steam_id = None
+
         if spawn_config:
             if bool(spawn_config.get("onePlayerMode")):
                 one_player_mode = True
                 effective_max_players = 1
             elif isinstance(spawn_config.get("maxPlayers"), int):
                 effective_max_players = int(spawn_config["maxPlayers"])
+            
+            party_leader_steam_id = spawn_config.get("partyLeaderSteamId")
 
         port = spawn_server(
             region=req.region,
@@ -784,6 +793,7 @@ async def games_custom_new(
             gamemode=req.gamemodeName,
             gamemode_data=req.gamemodeData,
             one_player_mode=one_player_mode,
+            party_leader_steam_id=party_leader_steam_id,
         )
         if port == -2:
             return GamesCustomNewResponse(status=503, message=BOOT_WAIT_MESSAGE, data=None)

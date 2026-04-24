@@ -1,5 +1,7 @@
 # Andromeda.Core
 
+![Andromeda banner](Assets/banner.png)
+
 Andromeda.Core is the control-plane API for matchmaking, party lifecycle, player auth, progression, and session orchestration.
 
 [![Discord](https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/fMbrCUKHP8)
@@ -84,4 +86,4 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ## Community
 
-[Join Discord](https://discord.gg/fMbrCUKHP8) for deployment support and operator discussion.
+[Join Discord](https://discord.gg/fMbrCUKHP8) for deployment support, live player counts, and an active community.

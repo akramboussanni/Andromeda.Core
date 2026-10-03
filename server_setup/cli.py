@@ -45,6 +45,7 @@ META_KEYS = (
     "ANDROMEDA_SETUP_CORE_URL",
     "ANDROMEDA_SETUP_PUBLIC_IP_OVERRIDE",
     "ANDROMEDA_SETUP_TUNNEL_CONFIG",
+    "ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE",
 )
 # Written by the earlier Core + Orchestrator setup; meaningless in single-server mode.
 LEGACY_META_KEYS = (
@@ -255,6 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     tunnel.add_argument("--tunnel-credentials", type=Path, help="existing named-tunnel credentials JSON")
     tunnel.add_argument("--tunnel-config", type=Path, help="where to write the generated config (default: <install root>/cloudflared/config.yml)")
     tunnel.add_argument("--use-tunnel-config", type=Path, help="use an existing cloudflared config you maintain instead of generating one")
+    tunnel.add_argument("--tunnel-token-file", type=Path, help="existing file containing a dashboard tunnel token")
 
     sessions = parser.add_argument_group("game servers")
     sessions.add_argument("--game-exe", "--game-executable", dest="game_exe", type=Path)
@@ -592,69 +594,42 @@ class Wizard:
             ui.ok(f"Using your existing tunnel config: {config}")
         else:
             creds = self._tunnel_credentials()
-            if not creds and exe and ui.interactive:
-                tunnel_name = cloudflare.validate_tunnel_name(args.tunnel_name)
-                if not cloudflare.has_origin_cert(self.deps.credential_dirs()):
-                    ui.say("  Opening Cloudflare login in your browser. Sign in and choose the domain,")
-                    ui.say("  then return here; setup will continue automatically.")
-                    result = self.deps.run([str(exe), "tunnel", "login"])
-                    if result.returncode != 0:
-                        raise SetupError("Cloudflare login did not finish successfully; rerun setup to try again.")
-
-                # A dashboard-created tunnel can be adopted without exposing its token:
-                # cloudflared writes tunnel-scoped credentials directly to this file.
-                credential_path = (self.root / "cloudflared" / f"{tunnel_name}.json").resolve()
-                credential_path.parent.mkdir(parents=True, exist_ok=True)
-                result = self.deps.run([
-                    str(exe), "tunnel", "token", "--credentials-file", str(credential_path), tunnel_name,
-                ])
-                if result.returncode != 0:
-                    ui.say(f"  Tunnel {tunnel_name!r} does not exist yet; creating it now.")
-                    result = self.deps.run([str(exe), "tunnel", "create", tunnel_name])
-                    if result.returncode != 0:
-                        raise SetupError(f"Could not create Cloudflare tunnel {tunnel_name!r}.")
-                    creds = self._tunnel_credentials()
-                else:
-                    try:
-                        creds = cloudflare.read_tunnel_credentials(credential_path)
-                    except ValueError as exc:
-                        raise SetupError(str(exc)) from None
-
-                if not creds:
-                    raise SetupError("Cloudflare authenticated, but no tunnel credentials were created.")
-                result = self.deps.run([
-                    str(exe), "tunnel", "route", "dns", "--overwrite-dns",
-                    creds.tunnel_id, plan.core_hostname,
-                ])
-                if result.returncode != 0:
-                    raise SetupError(f"Could not point {plan.core_hostname} at the Cloudflare tunnel.")
-                ui.ok(f"Cloudflare login and DNS route completed for {plan.core_hostname}")
             if creds:
                 ui.ok(f"Using existing tunnel {creds.tunnel_id} (credentials file {creds.path})")
                 ui.say("  DNS route command (safe to rerun if the hostname changes):")
                 ui.say(f"    {cloudflare.quote_arg(shown_exe)} tunnel route dns --overwrite-dns {creds.tunnel_id} {plan.core_hostname}")
                 tunnel_ref = creds.tunnel_id
+                text = cloudflare.render_config(tunnel_ref, plan.tunnel_routes, creds.path)
+                previous = self.remembered("ANDROMEDA_SETUP_TUNNEL_CONFIG")
+                config = (args.tunnel_config or (Path(previous) if previous else self.root / "cloudflared" / "config.yml"))
+                config = config.expanduser().resolve()
+                _write_file(ui, config, text, args.force, what="tunnel config")
+                plan.tunnel_config = config
             else:
-                try:
-                    tunnel_ref = cloudflare.validate_tunnel_name(args.tunnel_name)
-                except ValueError as exc:
-                    raise SetupError(str(exc)) from None
-                steps = cloudflare.setup_steps(shown_exe, tunnel_ref, [plan.core_hostname])
-                if cloudflare.has_origin_cert(self.deps.credential_dirs()):
-                    steps = steps[1:]  # already logged in
-                ui.warn("No tunnel credentials were found yet. Run these commands once on this server")
-                ui.say("  (the login command opens a browser where you pick your Cloudflare domain):")
-                for command in steps:
-                    ui.say(f"    {command}")
-                ui.say("  The generated config below works as soon as the tunnel exists; rerunning setup")
-                ui.say("  afterwards also records the exact credentials file.")
-                self.notes.append("Finish the Cloudflare Tunnel commands shown in step 5 before starting Andromeda.")
-            text = cloudflare.render_config(tunnel_ref, plan.tunnel_routes, creds.path if creds else None)
-            previous = self.remembered("ANDROMEDA_SETUP_TUNNEL_CONFIG")
-            config = (args.tunnel_config or (Path(previous) if previous else self.root / "cloudflared" / "config.yml"))
-            config = config.expanduser().resolve()
-            _write_file(ui, config, text, args.force, what="tunnel config")
-            plan.tunnel_config = config
+                remembered_token = self.remembered("ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE")
+                token_file = args.tunnel_token_file or (Path(remembered_token) if remembered_token else None)
+                if token_file:
+                    token_file = token_file.expanduser().resolve()
+                    if not token_file.is_file():
+                        raise SetupError(f"Cloudflare tunnel token file does not exist: {token_file}")
+                elif ui.interactive:
+                    ui.say("  Paste the token shown by Cloudflare for your dashboard-created tunnel.")
+                    token = ui.secret("Cloudflare tunnel token (input hidden)").strip()
+                    if not token:
+                        raise SetupError("A Cloudflare tunnel token is required for tunnel mode.")
+                    token_file = (self.root / "cloudflared" / "tunnel.token").resolve()
+                    token_file.parent.mkdir(parents=True, exist_ok=True)
+                    token_file.write_text(token + "\n", encoding="utf-8")
+                    try:
+                        token_file.chmod(0o600)
+                    except OSError:
+                        pass
+                    ui.ok(f"Cloudflare tunnel token saved securely to {token_file}")
+                else:
+                    raise SetupError("Tunnel mode needs --tunnel-token-file <path> (the token itself is never accepted on the command line).")
+                plan.tunnel_token_file = token_file
+                ui.ok("Using the dashboard-managed Cloudflare tunnel token; browser login is not required.")
+                ui.say(f"  In Cloudflare, publish {plan.core_hostname} to http://localhost:{plan.core_port}.")
         ui.say("")
         ui.say("  IMPORTANT: a Cloudflare Tunnel only carries Core's website and API (HTTP).")
         ui.say(f"  Game and voice traffic uses UDP ports {plan.port_start}-{plan.port_end}, which an ordinary Cloudflare")
@@ -719,6 +694,7 @@ class Wizard:
             "ANDROMEDA_SETUP_CORE_URL": plan.core_url,
             "ANDROMEDA_SETUP_PUBLIC_IP_OVERRIDE": self.manual_override,
             "ANDROMEDA_SETUP_TUNNEL_CONFIG": str(plan.tunnel_config or ""),
+            "ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE": str(plan.tunnel_token_file or ""),
         })
         removed = [key for key in ORCHESTRATOR_KEYS if key in self.prev]
         managed_values, default_values, preserved = envfile.merge(
@@ -956,9 +932,14 @@ def run_check(args: argparse.Namespace, ui: UI, deps: Deps) -> int:
     python = venv_python(CORE_DIR, deps.windows)
     check(python.exists(), f"Virtual environment: {python}", f"Missing {python}; run the setup", warn_only=True)
     if plan.http_mode == "tunnel":
-        configured = env.get("ANDROMEDA_SETUP_TUNNEL_CONFIG", "")
-        config = args.use_tunnel_config or args.tunnel_config or (Path(configured) if configured else root / "cloudflared" / "config.yml")
-        check(config.is_file(), f"Tunnel config: {config}", f"Tunnel config missing: {config}")
+        configured_token = env.get("ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE", "")
+        token_file = args.tunnel_token_file or (Path(configured_token) if configured_token else None)
+        if token_file:
+            check(token_file.is_file(), f"Tunnel token file: {token_file}", f"Tunnel token file missing: {token_file}")
+        else:
+            configured = env.get("ANDROMEDA_SETUP_TUNNEL_CONFIG", "")
+            config = args.use_tunnel_config or args.tunnel_config or (Path(configured) if configured else root / "cloudflared" / "config.yml")
+            check(config.is_file(), f"Tunnel config: {config}", f"Tunnel config missing: {config}")
         check(deps.find_cloudflared(root) is not None, "cloudflared found", "cloudflared not found", warn_only=True)
     check(deps.port_free(plan.core_port), f"Port {plan.core_port} (Core) is free",
           f"Port {plan.core_port} (Core) is in use (fine if Andromeda is already running)", warn_only=True)

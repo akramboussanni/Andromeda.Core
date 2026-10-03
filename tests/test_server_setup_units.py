@@ -224,6 +224,14 @@ class PlanTests(unittest.TestCase):
                       '"C:/Andromeda Server/cloudflared/config.yml" run"', tunnel)
         self.assertNotIn("uvicorn", text)
 
+    def test_windows_launcher_uses_tunnel_token_file(self):
+        p = self.make(core_dir=Path("C:/Andromeda Server/core"), install_root=Path("C:/Andromeda Server"),
+                      http_mode="tunnel", core_hostname="play.example.com",
+                      cloudflared="C:/Program Files/cloudflared/cloudflared.exe",
+                      tunnel_token_file=Path("C:/Andromeda Server/cloudflared/tunnel.token"))
+        text = plan.render_windows_launcher(p, plan.services(p, windows=True))
+        self.assertIn('tunnel run --token-file "C:/Andromeda Server/cloudflared/tunnel.token"', text)
+
     def test_posix_launcher(self):
         p = self.make()
         text = plan.render_posix_launcher(p, plan.services(p, windows=False))
@@ -297,7 +305,7 @@ class CloudflareTests(unittest.TestCase):
 class ManifestTests(unittest.TestCase):
     def test_defaults_match_this_release(self):
         pins = manifest.load(None)
-        self.assertEqual((pins.version, pins.mod_tag), ("0.11.3", "0.11.1"))
+        self.assertEqual((pins.version, pins.mod_tag), ("0.11.4", "0.11.1"))
         self.assertEqual(pins.mod_repo, "akramboussanni/Andromeda.Mod")
 
     def test_load_and_validate(self):

@@ -105,6 +105,7 @@ class WizardTestCase(unittest.TestCase):
             run=lambda cmd, **k: self.run_calls.append(cmd) or Result(),
             is_admin=lambda: False,
             port_free=lambda port: True,
+            cloudflared_service_installed=lambda: False,
             windows=True,
         )
         values.update(overrides)
@@ -334,27 +335,26 @@ class TunnelTests(WizardTestCase):
         self.assertEqual(self.run_cli(deps=deps), 0, self.text)
         self.assertIn("already up to date", self.text)
 
-    def test_noninteractive_tunnel_requires_token_file(self):
+    def test_non_windows_dashboard_token_setup_is_rejected(self):
         rc = self.run_cli("--http-mode", "tunnel", "--core-hostname", "play.example.com", deps=self.deps(windows=False))
         self.assertEqual(rc, 2, self.text)
-        self.assertIn("--tunnel-token-file", self.text)
+        self.assertIn("Windows setup only", self.text)
         self.assertNotIn("tunnel login", self.text)
 
     def test_windows_downloads_cloudflared_on_request(self):
         downloaded = []
-        token_file = self.root / "provided.token"
-        token_file.write_text("secret-token")
 
         def download(dest):
             downloaded.append(dest)
             return dest
 
-        rc = self.run_cli("--http-mode", "tunnel", "--core-hostname", "play.example.com", "--install-cloudflared",
-                          "--tunnel-token-file", str(token_file),
-                          deps=self.deps(download_cloudflared=download))
+        with mock.patch.dict(os.environ, {"CLOUDFLARE_TUNNEL_TOKEN": "secret-token"}):
+            rc = self.run_cli("--http-mode", "tunnel", "--core-hostname", "play.example.com", "--install-cloudflared",
+                              deps=self.deps(download_cloudflared=download, is_admin=lambda: True))
         self.assertEqual(rc, 0, self.text)
         self.assertEqual(downloaded, [self.root / "tools" / "cloudflared.exe"])
-        self.assertIn("cloudflared.exe", (self.root / "start_andromeda.bat").read_text())
+        self.assertIn("Cloudflare tunnel Windows service installed", self.text)
+        self.assertNotIn("secret-token", (self.root / "start_andromeda.bat").read_text())
 
     def test_interactive_setup_accepts_hidden_dashboard_token_without_login(self):
         cloudflared = self.root / "tools" / "cloudflared.exe"
@@ -365,25 +365,23 @@ class TunnelTests(WizardTestCase):
         rc = self.run_cli(
             "--http-mode", "tunnel", "--core-hostname", "play.example.com", "--cloudflared", str(cloudflared),
             interactive=lambda prompt: "", secret=lambda prompt: next(secrets),
-            deps=self.deps(find_cloudflared=lambda root: cloudflared),
+            deps=self.deps(find_cloudflared=lambda root: cloudflared, is_admin=lambda: True),
         )
         self.assertEqual(rc, 0, self.text)
-        token_file = self.root / "cloudflared" / "tunnel.token"
-        self.assertEqual(token_file.read_text(), "eyJ-hidden-tunnel-token\n")
         self.assertNotIn("eyJ-hidden-tunnel-token", self.text)
         self.assertNotIn("tunnel login", self.text)
+        self.assertIn([str(cloudflared), "service", "install", "eyJ-hidden-tunnel-token"], self.run_calls)
         launcher = (self.root / "start_andromeda.bat").read_text()
-        self.assertIn(f'tunnel run --token-file "{token_file}"', launcher)
+        self.assertNotIn("eyJ-hidden-tunnel-token", launcher)
+        self.assertNotIn("Andromeda Cloudflare Tunnel", launcher)
 
     def test_tunnel_needs_a_hostname(self):
         self.assertEqual(self.run_cli("--http-mode", "tunnel"), 2)
         self.assertIn("hostname is required", self.text)
 
     def test_switching_back_from_tunnel_reopens_core_port(self):
-        token_file = self.root / "provided.token"
-        token_file.write_text("secret-token")
         self.assertEqual(self.run_cli("--http-mode", "tunnel", "--core-hostname", "play.example.com",
-                                      "--tunnel-token-file", str(token_file)), 0, self.text)
+                                      deps=self.deps(cloudflared_service_installed=lambda: True)), 0, self.text)
         self.assertEqual(self.run_cli("--http-mode", "ip", "--force"), 0, self.text)
         self.assertEqual(self.env["CORE_HOST"], "0.0.0.0")
         self.assertIn('add rule name="Andromeda Core API"', self.text)
@@ -489,11 +487,8 @@ class FirewallTests(WizardTestCase):
         self.assertIn("Windows Firewall rules added", self.text)
 
     def test_tunnel_firewall_never_opens_core(self):
-        token_file = self.root / "provided.token"
-        token_file.write_text("secret-token")
         rc = self.run_cli("--apply-firewall", "--http-mode", "tunnel", "--core-hostname", "play.example.com",
-                          "--tunnel-token-file", str(token_file),
-                          deps=self.deps(is_admin=lambda: True))
+                          deps=self.deps(is_admin=lambda: True, cloudflared_service_installed=lambda: True))
         self.assertEqual(rc, 0, self.text)
         added = [next(a for a in cmd if a.startswith("localport=")) for cmd in self.run_calls if "add" in cmd]
         self.assertEqual(added, ["localport=7777-7977", "localport=7777-7977"])

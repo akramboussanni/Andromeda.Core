@@ -224,13 +224,14 @@ class PlanTests(unittest.TestCase):
                       '"C:/Andromeda Server/cloudflared/config.yml" run"', tunnel)
         self.assertNotIn("uvicorn", text)
 
-    def test_windows_launcher_uses_tunnel_token_file(self):
+    def test_windows_launcher_does_not_expose_service_token(self):
         p = self.make(core_dir=Path("C:/Andromeda Server/core"), install_root=Path("C:/Andromeda Server"),
                       http_mode="tunnel", core_hostname="play.example.com",
                       cloudflared="C:/Program Files/cloudflared/cloudflared.exe",
-                      tunnel_token_file=Path("C:/Andromeda Server/cloudflared/tunnel.token"))
+                      tunnel_service=True)
         text = plan.render_windows_launcher(p, plan.services(p, windows=True))
-        self.assertIn('tunnel run --token-file "C:/Andromeda Server/cloudflared/tunnel.token"', text)
+        self.assertNotIn("cloudflared", text.lower())
+        self.assertNotIn("token", text.lower())
 
     def test_posix_launcher(self):
         p = self.make()
@@ -305,7 +306,7 @@ class CloudflareTests(unittest.TestCase):
 class ManifestTests(unittest.TestCase):
     def test_defaults_match_this_release(self):
         pins = manifest.load(None)
-        self.assertEqual((pins.version, pins.mod_tag), ("0.11.4", "0.11.1"))
+        self.assertEqual((pins.version, pins.mod_tag), ("0.11.5", "0.11.5"))
         self.assertEqual(pins.mod_repo, "akramboussanni/Andromeda.Mod")
 
     def test_load_and_validate(self):
@@ -330,9 +331,9 @@ def make_zip(path: Path, files: dict[str, bytes]) -> Path:
     return path
 
 
-MOD_BYTES = b"MZ-andromeda-mod-0.11.1"
-MOD_URL = "https://github.com/akramboussanni/Andromeda.Mod/releases/download/0.11.1/Andromeda.Mod.dll"
-RELEASE = {"tag_name": "0.11.1", "assets": [
+MOD_BYTES = b"MZ-andromeda-mod-0.11.5"
+MOD_URL = "https://github.com/akramboussanni/Andromeda.Mod/releases/download/0.11.5/Andromeda.Mod.dll"
+RELEASE = {"tag_name": "0.11.5", "assets": [
     {"name": "Andromeda.Mod.pdb", "browser_download_url": "https://x/pdb"},
     {"name": "Andromeda.Mod.zip", "browser_download_url": "https://x/zip"},
     {"name": "Andromeda.Mod.dll", "browser_download_url": MOD_URL},
@@ -408,13 +409,13 @@ class GameTests(unittest.TestCase):
             self.assertTrue(exe.is_file())
             self.assertTrue(game.melonloader_installed(exe.parent))
             self.assertEqual(game.mod_path(exe.parent).read_bytes(), MOD_BYTES)
-            self.assertEqual(record["api"], ["https://api.github.com/repos/akramboussanni/Andromeda.Mod/releases/tags/0.11.1"])
+            self.assertEqual(record["api"], ["https://api.github.com/repos/akramboussanni/Andromeda.Mod/releases/tags/0.11.5"])
             self.assertIn(MOD_URL, record["fetched"])
             self.assertEqual(len(record["ran"]), 1)
             self.assertIn("hunter2", record["ran"][0])  # unattended login still works...
             self.assertFalse(any("hunter2" in line for line in record["logs"]))  # ...but the password is never printed
             self.assertEqual((exe.parent.parent / "steamcmd" / game.STEAM_USER_FILE).read_text(), "bob")
-            self.assertEqual(game.read_mod_stamp(exe.parent)["tag"], "0.11.1")
+            self.assertEqual(game.read_mod_stamp(exe.parent)["tag"], "0.11.5")
             self.assertEqual(sorted(p.name for p in exe.parent.parent.iterdir()), ["game", "steamcmd"], "downloads are cleaned up")
 
             # Rerun without update: the pinned mod is already installed, so nothing is downloaded or run.

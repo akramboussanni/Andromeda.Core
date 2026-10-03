@@ -51,7 +51,7 @@ class Plan:
     landing_page: bool = False
     cloudflared: str = ""
     tunnel_config: Path | None = None
-    tunnel_token_file: Path | None = None
+    tunnel_service: bool = False
 
     # --- derived values -------------------------------------------------
     @property
@@ -257,13 +257,7 @@ def services(plan: Plan, windows: bool) -> list[Service]:
         plan.core_dir,
         [str(venv_python(plan.core_dir, windows)), "main.py", "--host", plan.core_bind, "--port", str(plan.core_port)],
     )]
-    if plan.http_mode == "tunnel" and plan.cloudflared and plan.tunnel_token_file is not None:
-        result.append(Service(
-            "Andromeda Cloudflare Tunnel",
-            plan.install_root,
-            [plan.cloudflared, "tunnel", "run", "--token-file", str(plan.tunnel_token_file)],
-        ))
-    elif plan.http_mode == "tunnel" and plan.cloudflared and plan.tunnel_config is not None:
+    if plan.http_mode == "tunnel" and plan.cloudflared and plan.tunnel_config is not None:
         result.append(Service(
             "Andromeda Cloudflare Tunnel",
             plan.install_root,

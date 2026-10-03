@@ -45,7 +45,7 @@ META_KEYS = (
     "ANDROMEDA_SETUP_CORE_URL",
     "ANDROMEDA_SETUP_PUBLIC_IP_OVERRIDE",
     "ANDROMEDA_SETUP_TUNNEL_CONFIG",
-    "ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE",
+    "ANDROMEDA_SETUP_TUNNEL_SERVICE",
 )
 # Written by the earlier Core + Orchestrator setup; meaningless in single-server mode.
 LEGACY_META_KEYS = (
@@ -193,6 +193,13 @@ def _port_free(port: int) -> bool:
             return False
 
 
+def _cloudflared_service_installed() -> bool:
+    if os.name != "nt":
+        return False
+    result = subprocess.run(["sc.exe", "query", "cloudflared"], capture_output=True, text=True)
+    return result.returncode == 0
+
+
 @dataclass
 class Deps:
     detect_ip: Callable[[], publicip.Detection] = publicip.detect_public_ipv4
@@ -206,6 +213,7 @@ class Deps:
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run
     is_admin: Callable[[], bool] = _is_admin
     port_free: Callable[[int], bool] = _port_free
+    cloudflared_service_installed: Callable[[], bool] = _cloudflared_service_installed
     windows: bool = field(default_factory=lambda: os.name == "nt")
 
 
@@ -256,7 +264,6 @@ def build_parser() -> argparse.ArgumentParser:
     tunnel.add_argument("--tunnel-credentials", type=Path, help="existing named-tunnel credentials JSON")
     tunnel.add_argument("--tunnel-config", type=Path, help="where to write the generated config (default: <install root>/cloudflared/config.yml)")
     tunnel.add_argument("--use-tunnel-config", type=Path, help="use an existing cloudflared config you maintain instead of generating one")
-    tunnel.add_argument("--tunnel-token-file", type=Path, help="existing file containing a dashboard tunnel token")
 
     sessions = parser.add_argument_group("game servers")
     sessions.add_argument("--game-exe", "--game-executable", dest="game_exe", type=Path)
@@ -606,29 +613,27 @@ class Wizard:
                 _write_file(ui, config, text, args.force, what="tunnel config")
                 plan.tunnel_config = config
             else:
-                remembered_token = self.remembered("ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE")
-                token_file = args.tunnel_token_file or (Path(remembered_token) if remembered_token else None)
-                if token_file:
-                    token_file = token_file.expanduser().resolve()
-                    if not token_file.is_file():
-                        raise SetupError(f"Cloudflare tunnel token file does not exist: {token_file}")
-                elif ui.interactive:
-                    ui.say("  Paste the token shown by Cloudflare for your dashboard-created tunnel.")
-                    token = ui.secret("Cloudflare tunnel token (input hidden)").strip()
-                    if not token:
-                        raise SetupError("A Cloudflare tunnel token is required for tunnel mode.")
-                    token_file = (self.root / "cloudflared" / "tunnel.token").resolve()
-                    token_file.parent.mkdir(parents=True, exist_ok=True)
-                    token_file.write_text(token + "\n", encoding="utf-8")
-                    try:
-                        token_file.chmod(0o600)
-                    except OSError:
-                        pass
-                    ui.ok(f"Cloudflare tunnel token saved securely to {token_file}")
+                if not self.deps.windows:
+                    raise SetupError("Dashboard tunnel token installation is currently supported by the Windows setup only.")
+                if self.deps.cloudflared_service_installed():
+                    ui.ok("Cloudflare tunnel Windows service is already installed.")
                 else:
-                    raise SetupError("Tunnel mode needs --tunnel-token-file <path> (the token itself is never accepted on the command line).")
-                plan.tunnel_token_file = token_file
-                ui.ok("Using the dashboard-managed Cloudflare tunnel token; browser login is not required.")
+                    if not exe:
+                        raise SetupError("Install cloudflared before configuring the tunnel token.")
+                    token = os.environ.get("CLOUDFLARE_TUNNEL_TOKEN", "").strip()
+                    if not token and ui.interactive:
+                        ui.say("  Paste the token shown by Cloudflare for your dashboard-created tunnel.")
+                        token = ui.secret("Cloudflare tunnel token (input hidden)").strip()
+                    if not token:
+                        raise SetupError("A Cloudflare tunnel token is required (or set CLOUDFLARE_TUNNEL_TOKEN for unattended setup).")
+                    if not self.deps.is_admin():
+                        raise SetupError("Run the setup as Administrator so cloudflared can install its Windows service.")
+                    result = self.deps.run([str(exe), "service", "install", token], capture_output=True, text=True)
+                    if result.returncode != 0:
+                        raise SetupError("cloudflared could not install the Windows tunnel service.")
+                    ui.ok("Cloudflare tunnel Windows service installed.")
+                plan.tunnel_service = True
+                ui.ok("Browser login is not required, and Andromeda did not save or print the token.")
                 ui.say(f"  In Cloudflare, publish {plan.core_hostname} to http://localhost:{plan.core_port}.")
         ui.say("")
         ui.say("  IMPORTANT: a Cloudflare Tunnel only carries Core's website and API (HTTP).")
@@ -694,7 +699,7 @@ class Wizard:
             "ANDROMEDA_SETUP_CORE_URL": plan.core_url,
             "ANDROMEDA_SETUP_PUBLIC_IP_OVERRIDE": self.manual_override,
             "ANDROMEDA_SETUP_TUNNEL_CONFIG": str(plan.tunnel_config or ""),
-            "ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE": str(plan.tunnel_token_file or ""),
+            "ANDROMEDA_SETUP_TUNNEL_SERVICE": "true" if plan.tunnel_service else "false",
         })
         removed = [key for key in ORCHESTRATOR_KEYS if key in self.prev]
         managed_values, default_values, preserved = envfile.merge(
@@ -932,10 +937,9 @@ def run_check(args: argparse.Namespace, ui: UI, deps: Deps) -> int:
     python = venv_python(CORE_DIR, deps.windows)
     check(python.exists(), f"Virtual environment: {python}", f"Missing {python}; run the setup", warn_only=True)
     if plan.http_mode == "tunnel":
-        configured_token = env.get("ANDROMEDA_SETUP_TUNNEL_TOKEN_FILE", "")
-        token_file = args.tunnel_token_file or (Path(configured_token) if configured_token else None)
-        if token_file:
-            check(token_file.is_file(), f"Tunnel token file: {token_file}", f"Tunnel token file missing: {token_file}")
+        if env.get("ANDROMEDA_SETUP_TUNNEL_SERVICE", "").lower() == "true":
+            check(deps.cloudflared_service_installed(), "Cloudflare tunnel Windows service installed",
+                  "Cloudflare tunnel Windows service is missing")
         else:
             configured = env.get("ANDROMEDA_SETUP_TUNNEL_CONFIG", "")
             config = args.use_tunnel_config or args.tunnel_config or (Path(configured) if configured else root / "cloudflared" / "config.yml")

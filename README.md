@@ -19,7 +19,7 @@ Download `Andromeda.Server.Windows.zip` from the Andromeda release, extract it, 
 - installs SteamCMD, the game server, MelonLoader, and the compatible Andromeda.Mod;
 - writes one Core `.env` with `GAME_SESSION_PROVIDER=local`;
 - configures `SERVER_IP=auto`, which refreshes the router-facing public IPv4 when session data is requested;
-- optionally downloads `cloudflared` and accepts a dashboard tunnel token through a hidden prompt (no Cloudflare browser login);
+- optionally downloads `cloudflared`, accepts the dashboard tunnel token through a hidden prompt, and installs Cloudflare's Windows service (no browser login and no Andromeda token file);
 - creates the Core launcher and Windows Firewall rules.
 
 Andromeda.Orchestrator is not installed or started in this mode. It is only needed for advanced multi-host deployments.

@@ -297,7 +297,7 @@ class CloudflareTests(unittest.TestCase):
 class ManifestTests(unittest.TestCase):
     def test_defaults_match_this_release(self):
         pins = manifest.load(None)
-        self.assertEqual((pins.version, pins.mod_tag), ("0.11.2", "0.11.1"))
+        self.assertEqual((pins.version, pins.mod_tag), ("0.11.3", "0.11.1"))
         self.assertEqual(pins.mod_repo, "akramboussanni/Andromeda.Mod")
 
     def test_load_and_validate(self):

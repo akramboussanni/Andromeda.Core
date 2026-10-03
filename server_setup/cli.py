@@ -592,10 +592,47 @@ class Wizard:
             ui.ok(f"Using your existing tunnel config: {config}")
         else:
             creds = self._tunnel_credentials()
+            if not creds and exe and ui.interactive:
+                tunnel_name = cloudflare.validate_tunnel_name(args.tunnel_name)
+                if not cloudflare.has_origin_cert(self.deps.credential_dirs()):
+                    ui.say("  Opening Cloudflare login in your browser. Sign in and choose the domain,")
+                    ui.say("  then return here; setup will continue automatically.")
+                    result = self.deps.run([str(exe), "tunnel", "login"])
+                    if result.returncode != 0:
+                        raise SetupError("Cloudflare login did not finish successfully; rerun setup to try again.")
+
+                # A dashboard-created tunnel can be adopted without exposing its token:
+                # cloudflared writes tunnel-scoped credentials directly to this file.
+                credential_path = (self.root / "cloudflared" / f"{tunnel_name}.json").resolve()
+                credential_path.parent.mkdir(parents=True, exist_ok=True)
+                result = self.deps.run([
+                    str(exe), "tunnel", "token", "--credentials-file", str(credential_path), tunnel_name,
+                ])
+                if result.returncode != 0:
+                    ui.say(f"  Tunnel {tunnel_name!r} does not exist yet; creating it now.")
+                    result = self.deps.run([str(exe), "tunnel", "create", tunnel_name])
+                    if result.returncode != 0:
+                        raise SetupError(f"Could not create Cloudflare tunnel {tunnel_name!r}.")
+                    creds = self._tunnel_credentials()
+                else:
+                    try:
+                        creds = cloudflare.read_tunnel_credentials(credential_path)
+                    except ValueError as exc:
+                        raise SetupError(str(exc)) from None
+
+                if not creds:
+                    raise SetupError("Cloudflare authenticated, but no tunnel credentials were created.")
+                result = self.deps.run([
+                    str(exe), "tunnel", "route", "dns", "--overwrite-dns",
+                    creds.tunnel_id, plan.core_hostname,
+                ])
+                if result.returncode != 0:
+                    raise SetupError(f"Could not point {plan.core_hostname} at the Cloudflare tunnel.")
+                ui.ok(f"Cloudflare login and DNS route completed for {plan.core_hostname}")
             if creds:
                 ui.ok(f"Using existing tunnel {creds.tunnel_id} (credentials file {creds.path})")
-                ui.say("  Make sure the hostname points at this tunnel (safe to run again):")
-                ui.say(f"    {cloudflare.quote_arg(shown_exe)} tunnel route dns {creds.tunnel_id} {plan.core_hostname}")
+                ui.say("  DNS route command (safe to rerun if the hostname changes):")
+                ui.say(f"    {cloudflare.quote_arg(shown_exe)} tunnel route dns --overwrite-dns {creds.tunnel_id} {plan.core_hostname}")
                 tunnel_ref = creds.tunnel_id
             else:
                 try:

@@ -102,7 +102,7 @@ else:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "Andromeda.Core", "version": "0.11.2"}
+    return {"status": "ok", "service": "Andromeda.Core", "version": "0.11.3"}
 
 
 # ---------------------------------------------------------------------------

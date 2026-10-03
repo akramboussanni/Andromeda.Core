@@ -68,7 +68,7 @@ LANDING_PAGE = r"""<!doctype html>
       <div class="hero"><div><div class="eyebrow">Community-operated multiplayer</div>
         <h1>Back aboard.</h1><p class="lede">Andromeda reconnects Enemy On Board with private matchmaking, progression and dedicated game sessions — maintained in the open.</p>
         <div class="actions"><a class="button primary" href="https://github.com/akramboussanni/Andromeda.Installer/releases">Get the installer</a><a class="button" href="https://github.com/akramboussanni/Andromeda">View source</a></div></div>
-        <div class="orbit" aria-hidden="true"><div class="planet"></div><div class="status"><span class="dot"></span>CORE ONLINE · v0.11.2</div></div></div>
+        <div class="orbit" aria-hidden="true"><div class="planet"></div><div class="status"><span class="dot"></span>CORE ONLINE · v0.11.3</div></div></div>
       <section id="system"><div class="section-head"><div class="eyebrow">How it works</div><div><h2>One clean route back into the game.</h2><p class="section-copy">Install the compatibility mod once. Core handles player services and starts a dedicated game server only when a match needs one.</p></div></div>
         <div class="grid"><article class="card"><span class="number">01 / INSTALL</span><h3>Patch the client</h3><p>The guided installer locates your game, installs MelonLoader and keeps the Andromeda mod current.</p></article>
           <article class="card"><span class="number">02 / CONNECT</span><h3>Use community Core</h3><p>Accounts, parties, progression and matchmaking share a small, compatible control plane.</p></article>

@@ -318,7 +318,7 @@ class TunnelTests(WizardTestCase):
 
         self.assertIn("does NOT carry", self.text)
         self.assertIn("https://play.example.com", self.text)
-        self.assertIn("tunnel route dns 0f0e-tunnel play.example.com", self.text)
+        self.assertIn("tunnel route dns --overwrite-dns 0f0e-tunnel play.example.com", self.text)
         # Core's HTTP port is closed when tunnelled; game/voice ports are always open.
         self.assertNotIn("add rule name=\"Andromeda Core API\"", self.text)
         self.assertIn('delete rule name="Andromeda Core API"', self.text)
@@ -353,6 +353,35 @@ class TunnelTests(WizardTestCase):
         self.assertEqual(rc, 0, self.text)
         self.assertEqual(downloaded, [self.root / "tools" / "cloudflared.exe"])
         self.assertIn("cloudflared.exe", (self.root / "start_andromeda.bat").read_text())
+
+    def test_interactive_setup_logs_in_and_adopts_dashboard_tunnel(self):
+        cloudflared = self.root / "tools" / "cloudflared.exe"
+        cloudflared.parent.mkdir(parents=True)
+        cloudflared.write_bytes(b"MZ")
+
+        def run(cmd, **kwargs):
+            self.run_calls.append(cmd)
+            if cmd[1:3] == ["tunnel", "login"]:
+                (self.creds_dir / "cert.pem").write_text("account certificate")
+            if cmd[1:3] == ["tunnel", "token"]:
+                destination = Path(cmd[cmd.index("--credentials-file") + 1])
+                destination.write_text(json.dumps({
+                    "AccountTag": "account", "TunnelSecret": "secret", "TunnelID": "existing-dashboard-tunnel",
+                }))
+            return Result()
+
+        rc = self.run_cli(
+            "--http-mode", "tunnel", "--core-hostname", "play.example.com", "--cloudflared", str(cloudflared),
+            interactive=lambda prompt: "", deps=self.deps(find_cloudflared=lambda root: cloudflared, run=run),
+        )
+        self.assertEqual(rc, 0, self.text)
+        self.assertIn([str(cloudflared), "tunnel", "login"], self.run_calls)
+        self.assertTrue(any(call[1:3] == ["tunnel", "token"] for call in self.run_calls))
+        self.assertIn([
+            str(cloudflared), "tunnel", "route", "dns", "--overwrite-dns",
+            "existing-dashboard-tunnel", "play.example.com",
+        ], self.run_calls)
+        self.assertNotIn("secret", self.text)
 
     def test_tunnel_needs_a_hostname(self):
         self.assertEqual(self.run_cli("--http-mode", "tunnel"), 2)

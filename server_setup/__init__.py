@@ -11,5 +11,5 @@ before any virtual environment exists.
 
 MIN_PYTHON = (3, 10)
 # Release this setup belongs to; also the default Andromeda.Mod release tag.
-ANDROMEDA_VERSION = "0.11.5"
-DEFAULT_MOD_VERSION = "0.11.5"
+ANDROMEDA_VERSION = "0.11.6"
+DEFAULT_MOD_VERSION = "0.11.6"

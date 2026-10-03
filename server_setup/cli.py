@@ -200,6 +200,15 @@ def _cloudflared_service_installed() -> bool:
     return result.returncode == 0
 
 
+def _safe_process_details(result: subprocess.CompletedProcess, secret: str = "") -> str:
+    """Return short command diagnostics without ever echoing a supplied secret."""
+    raw = "\n".join(part for part in (getattr(result, "stdout", ""), getattr(result, "stderr", "")) if part)
+    if secret:
+        raw = raw.replace(secret, "<redacted>")
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    return "\n".join(lines[-8:])[:2000]
+
+
 @dataclass
 class Deps:
     detect_ip: Callable[[], publicip.Detection] = publicip.detect_public_ipv4
@@ -630,7 +639,15 @@ class Wizard:
                         raise SetupError("Run the setup as Administrator so cloudflared can install its Windows service.")
                     result = self.deps.run([str(exe), "service", "install", token], capture_output=True, text=True)
                     if result.returncode != 0:
-                        raise SetupError("cloudflared could not install the Windows tunnel service.")
+                        details = _safe_process_details(result, token)
+                        message = (
+                            f"cloudflared could not install the Windows tunnel service (exit code {result.returncode}).\n"
+                            "Common causes: setup is not running as Administrator, the token is incomplete, or a "
+                            "cloudflared service already exists."
+                        )
+                        if details:
+                            message += f"\ncloudflared said:\n{details}"
+                        raise SetupError(message)
                     ui.ok("Cloudflare tunnel Windows service installed.")
                 plan.tunnel_service = True
                 ui.ok("Browser login is not required, and Andromeda did not save or print the token.")

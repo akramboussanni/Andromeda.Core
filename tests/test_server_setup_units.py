@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from server_setup import cloudflare, envfile, game, manifest, plan, publicip  # noqa: E402
+from server_setup import bootstrap, cloudflare, envfile, game, manifest, plan, publicip  # noqa: E402
 
 PUBLIC_IP = "93.184.216.34"
 OTHER_IP = "93.184.216.99"
@@ -27,6 +27,30 @@ def fetcher(answers):
             raise value
         return value
     return fetch
+
+
+class BootstrapTests(unittest.TestCase):
+    def test_existing_matching_venv_is_reused_without_pip_install(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core = Path(tmp)
+            requirements = core / "requirements.txt"
+            requirements.write_text("fastapi==1.0\n")
+            python = core / "venv" / "bin" / "python"
+            python.parent.mkdir(parents=True)
+            python.write_text("existing python")
+            marker = core / "venv" / bootstrap.MARKER
+            marker.write_text(bootstrap.requirements_digest(requirements) + "\n")
+            calls = []
+            logs = []
+
+            class Completed:
+                returncode = 0
+
+            found = bootstrap.ensure_venv(core, windows=False, run=lambda cmd, **kw: calls.append(cmd) or Completed(),
+                                          log=logs.append)
+            self.assertEqual(found, python)
+            self.assertEqual(len(calls), 1, "only the lightweight Python version check should run")
+            self.assertTrue(any("already installed" in line for line in logs))
 
 
 class PublicIPTests(unittest.TestCase):
@@ -306,7 +330,7 @@ class CloudflareTests(unittest.TestCase):
 class ManifestTests(unittest.TestCase):
     def test_defaults_match_this_release(self):
         pins = manifest.load(None)
-        self.assertEqual((pins.version, pins.mod_tag), ("0.11.5", "0.11.5"))
+        self.assertEqual((pins.version, pins.mod_tag), ("0.11.6", "0.11.6"))
         self.assertEqual(pins.mod_repo, "akramboussanni/Andromeda.Mod")
 
     def test_load_and_validate(self):
@@ -331,9 +355,9 @@ def make_zip(path: Path, files: dict[str, bytes]) -> Path:
     return path
 
 
-MOD_BYTES = b"MZ-andromeda-mod-0.11.5"
-MOD_URL = "https://github.com/akramboussanni/Andromeda.Mod/releases/download/0.11.5/Andromeda.Mod.dll"
-RELEASE = {"tag_name": "0.11.5", "assets": [
+MOD_BYTES = b"MZ-andromeda-mod-0.11.6"
+MOD_URL = "https://github.com/akramboussanni/Andromeda.Mod/releases/download/0.11.6/Andromeda.Mod.dll"
+RELEASE = {"tag_name": "0.11.6", "assets": [
     {"name": "Andromeda.Mod.pdb", "browser_download_url": "https://x/pdb"},
     {"name": "Andromeda.Mod.zip", "browser_download_url": "https://x/zip"},
     {"name": "Andromeda.Mod.dll", "browser_download_url": MOD_URL},
@@ -409,13 +433,13 @@ class GameTests(unittest.TestCase):
             self.assertTrue(exe.is_file())
             self.assertTrue(game.melonloader_installed(exe.parent))
             self.assertEqual(game.mod_path(exe.parent).read_bytes(), MOD_BYTES)
-            self.assertEqual(record["api"], ["https://api.github.com/repos/akramboussanni/Andromeda.Mod/releases/tags/0.11.5"])
+            self.assertEqual(record["api"], ["https://api.github.com/repos/akramboussanni/Andromeda.Mod/releases/tags/0.11.6"])
             self.assertIn(MOD_URL, record["fetched"])
             self.assertEqual(len(record["ran"]), 1)
             self.assertIn("hunter2", record["ran"][0])  # unattended login still works...
             self.assertFalse(any("hunter2" in line for line in record["logs"]))  # ...but the password is never printed
             self.assertEqual((exe.parent.parent / "steamcmd" / game.STEAM_USER_FILE).read_text(), "bob")
-            self.assertEqual(game.read_mod_stamp(exe.parent)["tag"], "0.11.5")
+            self.assertEqual(game.read_mod_stamp(exe.parent)["tag"], "0.11.6")
             self.assertEqual(sorted(p.name for p in exe.parent.parent.iterdir()), ["game", "steamcmd"], "downloads are cleaned up")
 
             # Rerun without update: the pinned mod is already installed, so nothing is downloaded or run.

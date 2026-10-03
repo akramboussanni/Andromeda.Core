@@ -375,6 +375,28 @@ class TunnelTests(WizardTestCase):
         self.assertNotIn("eyJ-hidden-tunnel-token", launcher)
         self.assertNotIn("Andromeda Cloudflare Tunnel", launcher)
 
+    def test_cloudflared_failure_shows_redacted_diagnostics(self):
+        cloudflared = self.root / "tools" / "cloudflared.exe"
+        cloudflared.parent.mkdir(parents=True)
+        cloudflared.write_bytes(b"MZ")
+        token = "eyJ-super-secret-token"
+
+        def fail(cmd, **kwargs):
+            result = Result(23)
+            result.stderr = f"service install rejected token {token}: service already exists"
+            return result
+
+        rc = self.run_cli(
+            "--http-mode", "tunnel", "--core-hostname", "play.example.com", "--cloudflared", str(cloudflared),
+            interactive=lambda prompt: "", secret=token,
+            deps=self.deps(find_cloudflared=lambda root: cloudflared, is_admin=lambda: True, run=fail),
+        )
+        self.assertEqual(rc, 2, self.text)
+        self.assertIn("exit code 23", self.text)
+        self.assertIn("service already exists", self.text)
+        self.assertIn("<redacted>", self.text)
+        self.assertNotIn(token, self.text)
+
     def test_tunnel_needs_a_hostname(self):
         self.assertEqual(self.run_cli("--http-mode", "tunnel"), 2)
         self.assertIn("hostname is required", self.text)

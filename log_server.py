@@ -193,15 +193,16 @@ class LogHandler(socketserver.BaseRequestHandler):
 # ---------------------------------------------------------------------------
 
 class _ServerThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, port: int):
         super().__init__(daemon=True)
         # Using ThreadingTCPServer to allow multiple game instances to log concurrently
-        self.server = socketserver.ThreadingTCPServer(("0.0.0.0", 9090), LogHandler)
+        self.port = port
+        self.server = socketserver.ThreadingTCPServer(("0.0.0.0", port), LogHandler)
 
     def run(self):
-        print("[LogServer] Listening on :9090")
+        print(f"[LogServer] Listening on :{self.port}")
         self.server.serve_forever()
 
 
-def start_log_server():
-    _ServerThread().start()
+def start_log_server(port: int = 9090):
+    _ServerThread(port).start()

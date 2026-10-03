@@ -19,11 +19,23 @@ except ImportError:
 
 logger = logging.getLogger("GameServerService")
 
-GAME_EXE = os.getenv(
+CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def resolve_game_executable(path: str) -> str:
+    """Relative GAME_EXECUTABLE_PATH values are taken from the Core folder, not the current directory."""
+    path = os.path.expanduser(path)
+    return path if os.path.isabs(path) else os.path.join(CORE_DIR, path)
+
+
+GAME_EXE = resolve_game_executable(os.getenv(
     "GAME_EXECUTABLE_PATH",
     r"C:\Program Files (x86)\Steam\steamapps\common\EnemyOnBoard\enemy-on-board.exe",
-)
+))
 SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1")
+SERVER_IP = os.getenv("SERVER_IP", SERVER_HOST).strip()
+SERVER_IP_AUTO = SERVER_IP.lower() == "auto"
+SERVER_IP_CACHE_SECONDS = max(0, int(os.getenv("SERVER_IP_CACHE_SECONDS", "30")))
 GAME_SESSION_PROVIDER = os.getenv("GAME_SESSION_PROVIDER", "local").strip().lower()
 HOST_API_BASE_URL = os.getenv("GAME_HOST_API_BASE_URL", "").strip().rstrip("/")
 HOST_API_TOKEN = os.getenv("GAME_HOST_API_TOKEN", "").strip()
@@ -60,7 +72,7 @@ BOOT_WAIT_MESSAGE = os.getenv("GAME_HOST_BOOT_WAIT_MESSAGE", "Please wait a litt
 _boot_lock = threading.Lock()
 _last_boot_request_at = 0.0
 _warm_until = 0.0
-_resolved_server_host = SERVER_HOST
+_resolved_server_host = SERVER_HOST if SERVER_IP_AUTO else SERVER_IP
 _resolved_server_host_at = 0.0
 _port_lock = threading.Lock()
 _used_ports = set()
@@ -68,6 +80,17 @@ _session_runtime = {}
 _gcp_credentials_lock = threading.Lock()
 _gcp_credentials = None
 _last_session_activity_at = time.time()
+
+
+_SECRET_ENV_MARKERS = ("PASS", "TOKEN", "AUTH", "GUARD", "SECRET", "API_KEY", "CREDENTIAL")
+
+
+def _game_process_env() -> dict:
+    """Environment for local game processes: Core's own secrets (admin password, keys, tokens) stay out of it."""
+    return {
+        name: value for name, value in os.environ.items()
+        if not any(marker in name.upper() for marker in _SECRET_ENV_MARKERS)
+    }
 
 
 def _mark_session_activity() -> None:
@@ -90,6 +113,11 @@ def get_host_boot_state() -> dict:
         # Keep the cached host reasonably fresh for reporting endpoints.
         if now - _resolved_server_host_at > 30:
             _refresh_server_host_from_gcloud()
+    elif SERVER_IP_AUTO:
+        try:
+            get_server_host()
+        except RuntimeError as exc:
+            logger.warning("[GAMESERVER] Dynamic public IP refresh failed: %s", exc)
 
     with _boot_lock:
         now = time.time()
@@ -112,6 +140,10 @@ def get_server_host(force_refresh: bool = False) -> str:
     """Return the best-known reachable host/IP used by clients to connect to sessions."""
     if force_refresh and BOOT_PROVIDER == "gcloud":
         _refresh_server_host_from_gcloud()
+    elif SERVER_IP_AUTO:
+        now = time.time()
+        if force_refresh or not _resolved_server_host_at or now - _resolved_server_host_at >= SERVER_IP_CACHE_SECONDS:
+            _refresh_server_host_from_public_web()
     return _resolved_server_host
 
 
@@ -120,6 +152,21 @@ def _set_resolved_server_host(host: str):
     if host:
         _resolved_server_host = host
         _resolved_server_host_at = time.time()
+
+
+def _refresh_server_host_from_public_web() -> str:
+    """Resolve the router-facing IPv4 on demand for dynamic hosted connections."""
+    try:
+        from server_setup.publicip import detect_public_ipv4
+
+        detected = detect_public_ipv4()
+    except Exception as exc:
+        raise RuntimeError(
+            "SERVER_IP=auto could not determine the current public IPv4; "
+            "check internet access or set SERVER_IP to an explicit public IPv4"
+        ) from exc
+    _set_resolved_server_host(detected.ip)
+    return detected.ip
 
 
 def _host_api_headers() -> dict:
@@ -648,7 +695,7 @@ def spawn_server(
                 "-p", f"{game_port}:{game_port}/udp",
                 "-p", f"{game_port}:{game_port}/tcp",
                 "-p", f"{voice_port}:{voice_port}/udp",
-                "-e", f"SERVER_HOST={SERVER_HOST}",
+                "-e", f"SERVER_HOST={get_server_host()}",
                 "-e", f"ANDROMEDA_API_URL={SESSION_API_URL}",
                 DOCKER_IMAGE,
             ]
@@ -673,7 +720,10 @@ def spawn_server(
         cmd = [GAME_EXE] + args
         logger.info(f"[GAMESERVER] Executing: {' '.join(cmd)}")
         flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
-        proc = subprocess.Popen(cmd, creationflags=flags)
+        # MelonLoader and the game resolve their files next to the executable.
+        proc = subprocess.Popen(
+            cmd, cwd=os.path.dirname(GAME_EXE), env=_game_process_env(), creationflags=flags,
+        )
         _session_runtime[session_id] = {
             "runtime": "process",
             "pid": proc.pid,

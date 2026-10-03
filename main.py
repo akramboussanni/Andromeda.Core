@@ -13,7 +13,9 @@ enable_ansi_colors()  # enable VT100 on Windows CMD — controlled by ENABLE_ANS
 import database as db
 from catalog import Catalog
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from routes import admin, bot_api, client, server, shared
+from landing_page import LANDING_PAGE
 from utils.logging_middleware import log_requests_middleware
 from utils.upnp import open_port
 
@@ -44,19 +46,24 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("[INIT] Admin panel auth enabled.")
 
-    # 4. Start TCP log server and wire it into the async event loop
-    try:
-        from log_server import init_queue, start_log_server
-        start_log_server()
-        init_queue(asyncio.get_event_loop())
-        logger.info("[INIT] Log server started on :9090, draining to SQLite.")
-    except Exception as e:
-        logger.warning(f"[INIT] Log server not started: {e}")
+    # 4. The legacy TCP log collector is optional. Most deployments only need
+    # application stdout and the admin audit data stored by Core itself.
+    if os.getenv("ENABLE_LOG_SERVER", "false").lower() in ("1", "true", "yes", "on"):
+        try:
+            from log_server import init_queue, start_log_server
+            log_port = int(os.getenv("LOG_SERVER_PORT", "9090"))
+            start_log_server(port=log_port)
+            init_queue(asyncio.get_event_loop())
+            logger.info("[INIT] Log server started on :%s, draining to SQLite.", log_port)
+        except Exception as e:
+            logger.warning(f"[INIT] Log server not started: {e}")
+    else:
+        logger.info("[INIT] Optional TCP log server disabled (ENABLE_LOG_SERVER=false).")
 
     # 4. Optional UPnP
     if os.getenv("ENABLE_UPNP", "false").lower() == "true":
         logger.info("[INIT] Opening UPnP ports…")
-        open_port(8000, "TCP", "Andromeda API")
+        open_port(int(os.getenv("CORE_PORT", "8000")), "TCP", "Andromeda API")
     else:
         logger.info("[INIT] UPnP disabled.")
         
@@ -83,9 +90,19 @@ app.include_router(admin.router)
 app.include_router(bot_api.router)
 
 
-@app.get("/")
-async def root():
-    return {"message": "Andromeda Private Server", "version": "2.0.0"}
+if os.getenv("ENABLE_LANDING_PAGE", "false").lower() in ("1", "true", "yes", "on"):
+    @app.get("/", response_class=HTMLResponse)
+    async def root():
+        return LANDING_PAGE
+
+    logger.info("[INIT] Public landing page enabled at /.")
+else:
+    logger.info("[INIT] Public landing page disabled (ENABLE_LANDING_PAGE=false).")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "Andromeda.Core", "version": "0.11.2"}
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +110,9 @@ async def root():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Andromeda Private Server")
-    parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
+    # CORE_HOST/CORE_PORT come from .env (written by setup_server.py).
+    parser.add_argument("--host", default=os.getenv("CORE_HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("CORE_PORT", "8000")))
     parser.add_argument("--reload", action="store_true", help="Hot-reload (dev only)")
     args = parser.parse_args()
 

@@ -91,12 +91,48 @@ def resolve_path(value: str | Path, base: Path) -> Path:
 # Console helpers
 # ---------------------------------------------------------------------------
 
+def _read_masked(prompt: str, read_char: Callable[[], str], write: Callable[[str], object]) -> str:
+    """Read one console line while displaying asterisks instead of its characters."""
+    write(prompt)
+    chars: list[str] = []
+    while True:
+        char = read_char()
+        if char in ("\r", "\n"):
+            write("\n")
+            return "".join(chars)
+        if char == "\x03":
+            write("\n")
+            raise KeyboardInterrupt
+        if char in ("\b", "\x7f"):
+            if chars:
+                chars.pop()
+                write("\b \b")
+            continue
+        if char in ("\x00", "\xe0"):
+            read_char()  # discard the second half of a Windows special key
+            continue
+        if char.isprintable():
+            chars.append(char)
+            write("*")
+
+
+def masked_secret_input(prompt: str) -> str:
+    if os.name != "nt":
+        return getpass.getpass(prompt)
+    import msvcrt
+
+    def write(text: str) -> None:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    return _read_masked(prompt, msvcrt.getwch, write)
+
 class UI:
     def __init__(
         self,
         interactive: bool,
         input_fn: Callable[[str], str] = input,
-        secret_fn: Callable[[str], str] = getpass.getpass,
+        secret_fn: Callable[[str], str] = masked_secret_input,
         out: Callable[[str], None] = print,
     ):
         self.interactive = interactive

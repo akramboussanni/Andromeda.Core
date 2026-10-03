@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 import socketserver
 import threading
@@ -115,6 +116,8 @@ async def _drain():
 
 def init_queue(loop: asyncio.AbstractEventLoop):
     global _queue, _loop
+    if os.getenv("LOG_SERVER_MODE", "collector").strip().lower() == "stub":
+        return
     _queue = asyncio.Queue()
     _loop  = loop
     loop.create_task(_drain())
@@ -192,17 +195,41 @@ class LogHandler(socketserver.BaseRequestHandler):
 # Server
 # ---------------------------------------------------------------------------
 
+class StubLogHandler(socketserver.BaseRequestHandler):
+    """Accept the game's TCP log stream and discard it in bounded chunks."""
+
+    def handle(self):
+        try:
+            while self.request.recv(4096):
+                pass
+        except OSError:
+            # Clients may reset their connection when a game session exits.
+            pass
+
+
+class _TCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
 class _ServerThread(threading.Thread):
-    def __init__(self, port: int):
+    def __init__(self, port: int, mode: str = "collector"):
         super().__init__(daemon=True)
         # Using ThreadingTCPServer to allow multiple game instances to log concurrently
-        self.port = port
-        self.server = socketserver.ThreadingTCPServer(("0.0.0.0", port), LogHandler)
+        self.mode = mode
+        handler = StubLogHandler if mode == "stub" else LogHandler
+        self.server = _TCPServer(("0.0.0.0", port), handler)
+        self.port = self.server.server_address[1]
 
     def run(self):
-        print(f"[LogServer] Listening on :{self.port}")
+        print(f"[LogServer] Listening on :{self.port} ({self.mode})")
         self.server.serve_forever()
 
 
 def start_log_server(port: int = 9090):
-    _ServerThread(port).start()
+    mode = os.getenv("LOG_SERVER_MODE", "collector").strip().lower()
+    if mode not in ("stub", "collector"):
+        raise ValueError("LOG_SERVER_MODE must be stub or collector")
+    thread = _ServerThread(port, mode)
+    thread.start()
+    return thread

@@ -60,6 +60,7 @@ Andromeda.Orchestrator is not installed or started in this mode. It is only need
 - EOB_MANAGED_DEP_DIR (fallback source dir for building managed zip)
 - ENABLE_LOG_SERVER=true|false (optional legacy TCP collector; defaults to false)
 - LOG_SERVER_PORT (defaults to 9090 when the collector is enabled)
+- LOG_SERVER_MODE=collector|stub (default collector; stub accepts and discards TCP logs without storing them)
 
 ## Local development
 
